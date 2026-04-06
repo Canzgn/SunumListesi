@@ -774,3 +774,8 @@ def admin_sifre_degistir():
                         request.form.get('new_password', ''),
                         request.form.get('new_password2', ''))
     return redirect(request.referrer or url_for('admin.admin_panel'))
+
+@admin_bp.route('/hafta_yonetimi')
+@admin_required
+def admin_hafta_yonetimi():
+    return redirect(url_for('hoca.hoca_hafta_yonetimi'))

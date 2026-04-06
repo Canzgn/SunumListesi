@@ -399,3 +399,11 @@ def student_profile_edit():
                    (current_no,))
     student = cursor.fetchone()
     return render_template('student/student_profile_edit.html', student=student)
+
+
+# --- MESAJ GÖNDERME ---
+
+@student_bp.route('/mesaj_gonder')
+@student_required
+def mesaj_gonder_page():
+    return render_template('student/mesaj_gonder.html')

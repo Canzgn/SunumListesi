@@ -1,4 +1,4 @@
-﻿{% extends "shared/layout.html" %}
+{% extends "shared/layout.html" %}
 {% block content %}
 <div class="max-w-6xl mx-auto space-y-6">
 
@@ -7,6 +7,10 @@
             <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Hafta Yönetimi</h1>
             <p class="text-xs text-gray-500 font-medium mt-1">Sunum programı slotlarını buradan ekleyebilir, hafta numarasını değiştirebilir veya silebilirsiniz.</p>
         </div>
+        <a href="{{ url_for('hoca.hoca_panel') }}"
+           class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition">
+            <i class="fa-solid fa-arrow-left"></i> Panele Dön
+        </a>
     </div>
 
     {# BÖLÜM SEÇİMİ #}
@@ -25,6 +29,16 @@
     </form>
 
     {% if secili_bolum_id %}
+
+    {# FLASH MESAJLARI #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
 
     {# YENİ SLOT EKLEME #}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -49,114 +63,128 @@
         </form>
     </div>
 
-    {# SLOT LİSTESİ #}
-    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-        {% if slotlar %}
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
-                        <th class="p-4 font-black w-10">#</th>
-                        <th class="p-4 font-black w-24">Hafta</th>
-                        <th class="p-4 font-black w-36">Sunum Tarihi</th>
-                        <th class="p-4 font-black">Konu</th>
-                        <th class="p-4 font-black w-24">Tür</th>
-                        <th class="p-4 font-black text-center">İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    {% for slot in slotlar %}
-                    <tr class="hover:bg-gray-50 transition">
-                        <td class="p-3 text-gray-400 font-bold text-sm text-center">{{ loop.index }}</td>
-                        <td class="p-3">
-                            <div id="hafta-label-{{ slot.SunumID }}" class="font-black text-2xl text-gray-600 text-center">
-                                {{ slot.HaftaNo }}
-                            </div>
-                            <form id="hafta-form-{{ slot.SunumID }}" class="hidden"
-                                  action="{{ url_for('hoca.hoca_sunum_hafta_guncelle') }}" method="POST">
-                                <input type="hidden" name="sunum_id" value="{{ slot.SunumID }}">
-                                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
-                                <div class="flex gap-1 items-center">
-                                    <input type="number" name="hafta_no" value="{{ slot.HaftaNo }}" min="1" max="52"
-                                           class="w-16 border border-cyan-300 rounded-lg px-2 py-1 text-sm font-bold text-center outline-none focus:border-cyan-500">
-                                    <button type="submit"
-                                            class="bg-cyan-600 text-white px-2 py-1 rounded-lg font-black text-[10px] transition hover:bg-cyan-700">OK</button>
-                                </div>
-                            </form>
-                        </td>
-                        <td class="p-3">
-                            <div id="tarih-label-{{ slot.SunumID }}" class="font-bold text-sm text-gray-700">
-                                {% if slot.SunumTarihi %}
-                                    {{ slot.SunumTarihi.strftime('%d.%m.%Y') }}
-                                    <span class="text-[10px] text-gray-400 block">{{ ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'][slot.SunumTarihi.weekday()] }}</span>
-                                {% else %}
-                                    <span class="text-gray-300">—</span>
-                                {% endif %}
-                            </div>
-                            <form id="tarih-form-{{ slot.SunumID }}" class="hidden"
-                                  action="{{ url_for('hoca.hoca_sunum_tarih_guncelle') }}" method="POST">
-                                <input type="hidden" name="sunum_id" value="{{ slot.SunumID }}">
-                                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
-                                <input type="hidden" name="hafta_no" value="{{ slot.HaftaNo }}">
-                                <div class="flex flex-col gap-1">
-                                    <input type="date" name="sunum_tarihi"
-                                           value="{{ slot.SunumTarihi.strftime('%Y-%m-%d') if slot.SunumTarihi else '' }}"
-                                           class="w-36 border border-cyan-300 rounded-lg px-2 py-1 text-sm font-bold outline-none focus:border-cyan-500">
-                                    <label class="flex items-center gap-1 text-[10px] text-gray-500 font-bold">
-                                        <input type="checkbox" name="shift_others" value="1" class="rounded">
-                                        Sonraki haftaları da kaydır
-                                    </label>
-                                    <button type="submit"
-                                            class="bg-cyan-600 text-white px-2 py-1 rounded-lg font-black text-[10px] transition hover:bg-cyan-700">Kaydet</button>
-                                </div>
-                            </form>
-                        </td>
-                        <td class="p-3 font-bold text-sm text-gray-800">{{ slot.KonuAdi }}</td>
-                        <td class="p-3">
-                            <span class="text-[11px] font-black px-2 py-0.5 rounded-full
-                                {% if slot.OgretimTuru == 'Örgün' %}bg-blue-100 text-blue-700{% else %}bg-violet-100 text-violet-700{% endif %}">
-                                {{ slot.OgretimTuru }}
-                            </span>
-                        </td>
-                        <td class="p-3 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <button type="button" onclick="toggleHaftaEdit({{ slot.SunumID }})"
-                                        class="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition"
-                                        title="Hafta değiştir">
-                                    <i class="fa-solid fa-calendar-pen"></i>
-                                </button>
-                                <button type="button" onclick="toggleTarihEdit({{ slot.SunumID }})"
-                                        class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition"
-                                        title="Tarih değiştir">
-                                    <i class="fa-solid fa-calendar-day"></i>
-                                </button>
-                                <form action="{{ url_for('hoca.hoca_sunum_sil', sunum_id=slot.SunumID) }}" method="POST"
-                                      onsubmit="return confirm('{{ slot.KonuAdi }} (Hafta {{ slot.HaftaNo }}) slotu silinsin mi?')">
-                                    <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
-                                    <button type="submit"
-                                            class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition"
-                                            title="Slotu sil">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {# KART-BAZLI SLOT LİSTESİ #}
+    {% if slotlar %}
+
+    {# Haftalara göre grupla #}
+    {% set ns = namespace(last_week=0) %}
+    {% for slot in slotlar %}
+
+    {% if slot.HaftaNo != ns.last_week %}
+    {# Hafta Ayracı #}
+    <div class="flex items-center gap-3 mt-6 mb-2">
+        <div class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2 rounded-xl font-black text-xs tracking-widest uppercase shadow-lg shadow-cyan-200 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-week text-sm"></i>
+            {{ slot.HaftaNo }}. Hafta
         </div>
-        <div class="px-4 py-2 text-[11px] text-gray-400 font-bold border-t border-gray-100">
-            Toplam {{ slotlar|length }} slot
-        </div>
-        {% else %}
-        <div class="p-12 text-center">
-            <i class="fa-solid fa-calendar-xmark text-gray-300 text-5xl mb-4"></i>
-            <p class="font-black text-gray-400 text-lg">Bu bölüme ait slot yok</p>
-            <p class="text-gray-400 text-sm mt-1">Yukarıdaki formdan ilk slotu ekleyin.</p>
-        </div>
-        {% endif %}
+        <div class="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent"></div>
     </div>
+    {% set ns.last_week = slot.HaftaNo %}
+    {% endif %}
+
+    {# Slot Kartı #}
+    <div class="slot-card bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200 group"
+         id="slot-{{ slot.SunumID }}">
+        <div class="flex items-center gap-0">
+
+            {# Sol: Hafta Numarası Block #}
+            <div class="w-20 flex-shrink-0 bg-gradient-to-b from-slate-700 to-slate-800 text-white flex flex-col items-center justify-center py-4 self-stretch">
+                <span class="text-2xl font-black leading-none">{{ slot.HaftaNo }}</span>
+                <span class="text-[8px] font-bold uppercase tracking-widest mt-1 opacity-60">Hafta</span>
+            </div>
+
+            {# Orta: Bilgiler #}
+            <div class="flex-1 p-4 min-w-0">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h3 class="font-black text-gray-800 text-sm">{{ slot.KonuAdi }}</h3>
+                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full
+                        {% if slot.OgretimTuru == 'Örgün' %}bg-blue-100 text-blue-700{% else %}bg-violet-100 text-violet-700{% endif %}">
+                        {{ slot.OgretimTuru }}
+                    </span>
+                </div>
+                {% if slot.SunumTarihi %}
+                <div class="flex items-center gap-2 mt-1.5">
+                    <i class="fa-regular fa-calendar text-gray-400 text-xs"></i>
+                    <span class="text-xs font-bold text-gray-500">
+                        {{ slot.SunumTarihi.strftime('%d.%m.%Y') }}
+                        <span class="text-gray-400 font-medium">— {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][slot.SunumTarihi.weekday()] }}</span>
+                    </span>
+                </div>
+                {% else %}
+                <p class="text-[11px] text-gray-300 font-bold mt-1.5 italic">Tarih atanmamış</p>
+                {% endif %}
+            </div>
+
+            {# Sağ: İşlem Butonları #}
+            <div class="flex items-center gap-1.5 pr-4 flex-shrink-0">
+                <button type="button" onclick="openMoveModal({{ slot.SunumID }}, {{ slot.HaftaNo }}, '{{ slot.KonuAdi }}')"
+                        class="w-9 h-9 flex items-center justify-center bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 rounded-xl font-black text-xs transition"
+                        title="Başka haftaya taşı">
+                    <i class="fa-solid fa-arrows-up-down-left-right text-sm"></i>
+                </button>
+                <button type="button" onclick="toggleEditPanel('edit-{{ slot.SunumID }}')"
+                        class="w-9 h-9 flex items-center justify-center bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl font-black text-xs transition"
+                        title="Tarih düzenle">
+                    <i class="fa-solid fa-calendar-day text-sm"></i>
+                </button>
+                <form action="{{ url_for('hoca.hoca_sunum_sil', sunum_id=slot.SunumID) }}" method="POST"
+                      onsubmit="return confirm('{{ slot.KonuAdi }} (Hafta {{ slot.HaftaNo }}) slotu silinsin mi?')">
+                    <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                    <button type="submit"
+                            class="w-9 h-9 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl font-black text-xs transition"
+                            title="Slotu sil">
+                        <i class="fa-solid fa-trash text-sm"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {# Gizlenebilir Tarih Düzenleme Paneli #}
+        <div id="edit-{{ slot.SunumID }}" class="edit-panel hidden border-t border-gray-100 bg-slate-50 overflow-hidden transition-all duration-300">
+            <form action="{{ url_for('hoca.hoca_sunum_tarih_guncelle') }}" method="POST" class="p-4">
+                <input type="hidden" name="sunum_id" value="{{ slot.SunumID }}">
+                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                <input type="hidden" name="hafta_no" value="{{ slot.HaftaNo }}">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-pen text-cyan-500"></i>
+                        <span class="text-xs font-black text-gray-600">Yeni Tarih:</span>
+                    </div>
+                    <input type="date" name="sunum_tarihi"
+                           value="{{ slot.SunumTarihi.strftime('%Y-%m-%d') if slot.SunumTarihi else '' }}"
+                           class="border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-cyan-400 bg-white">
+                    <label class="flex items-center gap-2 text-[11px] text-gray-500 font-bold cursor-pointer select-none bg-white px-3 py-2 rounded-xl border border-gray-200">
+                        <input type="checkbox" name="shift_others" value="1" class="rounded accent-cyan-600 w-4 h-4">
+                        Sonraki haftaları da kaydır
+                    </label>
+                    <div class="flex gap-2 ml-auto">
+                        <button type="submit"
+                                class="bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2 rounded-xl font-black text-xs transition">
+                            <i class="fa-solid fa-check mr-1"></i>Kaydet
+                        </button>
+                        <button type="button" onclick="toggleEditPanel('edit-{{ slot.SunumID }}')"
+                                class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-4 py-2 rounded-xl font-black text-xs transition">
+                            İptal
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% endfor %}
+
+    <div class="text-center text-[11px] text-gray-400 font-bold mt-4 py-2">
+        Toplam {{ slotlar|length }} slot
+    </div>
+
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center border border-gray-100">
+        <i class="fa-solid fa-calendar-xmark text-gray-300 text-5xl mb-4"></i>
+        <p class="font-black text-gray-400 text-lg">Bu bölüme ait slot yok</p>
+        <p class="text-gray-400 text-sm mt-1">Yukarıdaki formdan ilk slotu ekleyin.</p>
+    </div>
+    {% endif %}
 
     {% else %}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
@@ -167,14 +195,147 @@
 
 </div>
 
+{# HAFTA TAŞIMA MODALI #}
+<div id="moveModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm" onclick="closeMoveModal(event)">
+    <div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm mx-4 transform transition-all scale-95 opacity-0"
+         id="moveModalContent" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-black text-gray-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-arrows-up-down-left-right text-cyan-600"></i>
+                Konuyu Taşı
+            </h3>
+            <button onclick="closeMoveModal()" class="text-gray-400 hover:text-gray-600 transition p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl p-3 mb-4">
+            <p class="text-[10px] text-gray-400 font-black uppercase tracking-wider mb-1">Taşınacak Konu</p>
+            <p class="font-black text-gray-700 text-sm" id="moveKonuAdi">—</p>
+            <p class="text-[10px] text-gray-400 mt-1">Mevcut hafta: <span class="font-black text-gray-600" id="moveCurrentHafta">—</span></p>
+        </div>
+
+        <form action="{{ url_for('hoca.hoca_sunum_hafta_guncelle') }}" method="POST">
+            <input type="hidden" name="sunum_id" id="moveSunumId">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Hedef Hafta</label>
+            <div class="grid grid-cols-7 gap-1.5 mb-4" id="weekGrid">
+                {% for w in range(1, 16) %}
+                <button type="button" onclick="selectWeek(this, {{ w }})"
+                        class="week-btn w-10 h-10 rounded-xl font-black text-sm border-2 border-gray-200 hover:border-cyan-400 hover:bg-cyan-50 text-gray-600 transition flex items-center justify-center"
+                        data-week="{{ w }}">
+                    {{ w }}
+                </button>
+                {% endfor %}
+            </div>
+
+            <input type="hidden" name="hafta_no" id="moveTargetHafta" required>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="closeMoveModal()"
+                        class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl font-black text-xs transition">
+                    İptal
+                </button>
+                <button type="submit" id="moveSaveBtn" disabled
+                        class="flex-1 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-xl font-black text-xs transition shadow-lg shadow-cyan-200 disabled:shadow-none">
+                    <i class="fa-solid fa-check mr-1"></i>Taşı
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .edit-panel {
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        opacity: 0;
+    }
+    .edit-panel.open {
+        max-height: 200px;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        opacity: 1;
+    }
+    .week-btn.selected {
+        border-color: #0891b2 !important;
+        background: #0891b2 !important;
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+    }
+    .week-btn.current {
+        border-color: #94a3b8 !important;
+        background: #f1f5f9 !important;
+        color: #64748b !important;
+        pointer-events: none;
+        opacity: 0.5;
+    }
+</style>
+
 <script>
-function toggleHaftaEdit(id) {
-    document.getElementById('hafta-label-' + id).classList.toggle('hidden');
-    document.getElementById('hafta-form-' + id).classList.toggle('hidden');
+function toggleEditPanel(id) {
+    const panel = document.getElementById(id);
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            panel.classList.add('open');
+        });
+    } else {
+        panel.classList.remove('open');
+        panel.addEventListener('transitionend', function handler() {
+            panel.classList.add('hidden');
+            panel.removeEventListener('transitionend', handler);
+        });
+    }
 }
-function toggleTarihEdit(id) {
-    document.getElementById('tarih-label-' + id).classList.toggle('hidden');
-    document.getElementById('tarih-form-' + id).classList.toggle('hidden');
+
+let currentMoveHafta = 0;
+
+function openMoveModal(sunumId, hafta, konuAdi) {
+    currentMoveHafta = hafta;
+    document.getElementById('moveSunumId').value = sunumId;
+    document.getElementById('moveKonuAdi').textContent = konuAdi;
+    document.getElementById('moveCurrentHafta').textContent = hafta;
+    document.getElementById('moveTargetHafta').value = '';
+    document.getElementById('moveSaveBtn').disabled = true;
+
+    // Hafta butonlarını sıfırla
+    document.querySelectorAll('.week-btn').forEach(btn => {
+        btn.classList.remove('selected', 'current');
+        if (parseInt(btn.dataset.week) === hafta) {
+            btn.classList.add('current');
+        }
+    });
+
+    const modal = document.getElementById('moveModal');
+    const content = document.getElementById('moveModalContent');
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    });
+}
+
+function closeMoveModal(e) {
+    if (e && e.target !== document.getElementById('moveModal')) return;
+    const modal = document.getElementById('moveModal');
+    const content = document.getElementById('moveModalContent');
+    content.classList.remove('scale-100', 'opacity-100');
+    content.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }, 200);
+}
+
+function selectWeek(btn, week) {
+    document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('moveTargetHafta').value = week;
+    document.getElementById('moveSaveBtn').disabled = false;
 }
 </script>
 {% endblock %}

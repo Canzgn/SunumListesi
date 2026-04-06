@@ -1,0 +1,111 @@
+{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+    {# BAŞLIK #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-indigo-500">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter flex items-center gap-3">
+                    <i class="fa-solid fa-paper-plane text-indigo-500"></i>
+                    Mesaj Gönder
+                </h1>
+                <p class="text-xs text-gray-500 font-medium mt-1">Hocaya veya admine mesaj gönderin.</p>
+            </div>
+            <a href="{{ url_for('student.student_panel') }}"
+               class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition">
+                <i class="fa-solid fa-arrow-left"></i> Panele Dön
+            </a>
+        </div>
+    </div>
+
+    {# FLASH MESAJLARI #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# MESAJ GÖNDERME FORMU #}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <form action="{{ url_for('mesaj.mesaj_gonder') }}" method="POST" class="p-6 space-y-5">
+            <input type="hidden" name="redirect_url" value="{{ url_for('student.mesaj_gonder_page') }}">
+
+            {# Alıcı Seçimi #}
+            <div>
+                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Kime Gönderilsin?</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="alici-option cursor-pointer" id="alici-hoca-label">
+                        <input type="radio" name="alici_rol" value="hoca" class="hidden" id="alici-hoca" checked onchange="updateAlici()">
+                        <div class="border-2 border-purple-500 bg-purple-50 text-purple-700 rounded-xl p-4 text-center font-black text-sm transition hover:shadow-md">
+                            <i class="fa-solid fa-chalkboard-user text-xl mb-2 block"></i>
+                            Hocaya Gönder
+                        </div>
+                    </label>
+                    <label class="alici-option cursor-pointer" id="alici-admin-label">
+                        <input type="radio" name="alici_rol" value="admin" class="hidden" id="alici-admin" onchange="updateAlici()">
+                        <div class="border-2 border-gray-200 text-gray-500 rounded-xl p-4 text-center font-black text-sm transition hover:shadow-md hover:border-blue-300">
+                            <i class="fa-solid fa-user-shield text-xl mb-2 block"></i>
+                            Admine Gönder
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            {# Konu #}
+            <div>
+                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Konu *</label>
+                <div class="relative">
+                    <i class="fa-solid fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" name="konu" required placeholder="Mesajınızın konusunu yazın"
+                           class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-indigo-400 bg-gray-50 focus:bg-white transition">
+                </div>
+            </div>
+
+            {# İçerik #}
+            <div>
+                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Mesajınız *</label>
+                <textarea name="icerik" required rows="6" placeholder="Mesajınızı buraya yazın..."
+                          class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-indigo-400 bg-gray-50 focus:bg-white transition resize-none"></textarea>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black text-sm transition shadow-lg shadow-indigo-200 hover:shadow-indigo-300 active:scale-[0.98]">
+                    <i class="fa-solid fa-paper-plane"></i> Gönder
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {# BİLGİ NOTU #}
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+        <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
+        <div>
+            <p class="text-blue-800 font-bold text-sm">Mesajınız ilgili kişiye iletilecektir</p>
+            <p class="text-blue-600 text-xs mt-0.5">Hoca veya admin, mesajınızı gelen kutusu panelinden görecek. Yanıt almak için lütfen iletişim bilgilerinizi mesaj içeriğine ekleyin.</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function updateAlici() {
+    const hocaChecked = document.getElementById('alici-hoca').checked;
+    const hocaDiv = document.querySelector('#alici-hoca-label .border-2');
+    const adminDiv = document.querySelector('#alici-admin-label .border-2');
+
+    if (hocaChecked) {
+        hocaDiv.className = 'border-2 border-purple-500 bg-purple-50 text-purple-700 rounded-xl p-4 text-center font-black text-sm transition hover:shadow-md';
+        adminDiv.className = 'border-2 border-gray-200 text-gray-500 rounded-xl p-4 text-center font-black text-sm transition hover:shadow-md hover:border-blue-300';
+    } else {
+        adminDiv.className = 'border-2 border-blue-500 bg-blue-50 text-blue-700 rounded-xl p-4 text-center font-black text-sm transition hover:shadow-md';
+        hocaDiv.className = 'border-2 border-gray-200 text-gray-500 rounded-xl p-4 text-center font-black text-sm transition hover:shadow-md hover:border-purple-300';
+    }
+}
+</script>
+{% endblock %}

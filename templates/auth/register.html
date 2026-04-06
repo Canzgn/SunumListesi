@@ -68,11 +68,8 @@
                         <input type="text" name="ogrenci_no" id="ogrenci_no_input"
                             required
                             placeholder="2021010001"
-                            oninput="lookupStudent(this.value)"
                             class="input-field w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 focus:bg-white transition">
-                        <span id="lookup-badge" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg"></span>
                     </div>
-                    <p id="lookup-name" class="mt-1 text-xs text-emerald-600 font-bold hidden"></p>
                 </div>
 
                 <!-- Ad Soyad (sadece öğrenci için) -->
@@ -182,39 +179,6 @@
         </p>
 
     <script>
-        let lookupTimeout;
-        function lookupStudent(val) {
-            clearTimeout(lookupTimeout);
-            const badge = document.getElementById('lookup-badge');
-            const nameEl = document.getElementById('lookup-name');
-            const adInput = document.getElementById('ad_soyad_input');
-            if (val.length < 7) { badge.classList.add('hidden'); nameEl.classList.add('hidden'); return; }
-            lookupTimeout = setTimeout(() => {
-                fetch('/api/student_lookup?no=' + encodeURIComponent(val))
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.found) {
-                            badge.textContent = '✓ Bulundu';
-                            badge.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700';
-                            if (data.ad_soyad) {
-                                nameEl.textContent = data.ad_soyad;
-                                nameEl.classList.remove('hidden');
-                                adInput.value = data.ad_soyad;
-                                adInput.readOnly = true;
-                                adInput.classList.add('bg-emerald-50');
-                            }
-                        } else {
-                            badge.textContent = '✗ Bulunamadı';
-                            badge.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg bg-red-100 text-red-700';
-                            nameEl.classList.add('hidden');
-                            adInput.readOnly = false;
-                            adInput.classList.remove('bg-emerald-50');
-                        }
-                        badge.classList.remove('hidden');
-                    });
-            }, 500);
-        }
-
         function setRegType(type) {
             document.getElementById('reg_type').value = type;
             const btnS = document.getElementById('btn-student');

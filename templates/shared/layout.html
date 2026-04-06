@@ -85,6 +85,9 @@
                 <a href="/admin/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/panel' %}active{% endif %}">
                     <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
                 </a>
+                <a href="/hoca/hafta_yonetimi" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/hafta_yonetimi' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-days w-6 text-center mr-2"></i> Hafta Yönetimi
+                </a>
                 <a href="/admin/students" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/students' %}active{% endif %}">
                     <i class="fa-solid fa-users w-6 text-center mr-2"></i> Öğrenci Listesi
                 </a>
@@ -99,6 +102,10 @@
                 </a>
                 <a href="/hoca/kontrolcular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/kontrolcular' %}active{% endif %}">
                     <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Kontrolcüleri
+                </a>
+                <a href="/mesaj/mesajlarim" class="nav-link flex items-center p-3 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/mesaj/mesajlarim' %}active{% endif %}">
+                    <i class="fa-solid fa-envelope w-6 text-center mr-2"></i> Mesajlar
+                    <span id="mesaj-badge-nav" class="ml-auto bg-indigo-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 hidden">0</span>
                 </a>
                 <a href="/admin/duyurular" class="nav-link flex items-center p-3 text-yellow-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/duyurular' %}active{% endif %}">
                     <i class="fa-solid fa-bullhorn w-6 text-center mr-2"></i> Duyurular
@@ -143,6 +150,10 @@
                 <a href="/hoca/ogretmen_ekle" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/ogretmen_ekle' %}active{% endif %}">
                     <i class="fa-solid fa-user-plus w-6 text-center mr-2"></i> Öğretmen Ekle
                 </a>
+                <a href="/mesaj/mesajlarim" class="nav-link flex items-center p-3 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/mesaj/mesajlarim' %}active{% endif %}">
+                    <i class="fa-solid fa-envelope w-6 text-center mr-2"></i> Mesajlar
+                    <span id="mesaj-badge-nav" class="ml-auto bg-indigo-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 hidden">0</span>
+                </a>
                 <a href="/hoca/profil" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/profil' %}active{% endif %}">
                     <i class="fa-solid fa-id-badge w-6 text-center mr-2"></i> Profilim
                 </a>
@@ -162,6 +173,9 @@
                 </a>
                 <a href="/student/duyurular" class="nav-link flex items-center p-3 text-yellow-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/duyurular' %}active{% endif %}">
                     <i class="fa-solid fa-bullhorn w-6 text-center mr-2"></i> Duyurular
+                </a>
+                <a href="/student/mesaj_gonder" class="nav-link flex items-center p-3 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/mesaj_gonder' %}active{% endif %}">
+                    <i class="fa-solid fa-paper-plane w-6 text-center mr-2"></i> Mesaj Gönder
                 </a>
                 <a href="/student/profile_edit" class="nav-link flex items-center p-3 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/profile_edit' %}active{% endif %}">
                     <i class="fa-solid fa-user-pen w-6 text-center mr-2"></i> Profil Düzenle
@@ -272,6 +286,19 @@
                     if (badge) { badge.textContent = data.length; badge.classList.remove('hidden'); }
                 }
             }).catch(() => {});
+
+        /* ---- Mesaj Badge (okunmamış mesaj sayısı) ---- */
+        {% if session.user_role in ['hoca', 'admin'] %}
+        fetch('/mesaj/api/okunmamis_mesaj_sayisi')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('mesaj-badge-nav');
+                if (badge && data.count > 0) {
+                    badge.textContent = data.count;
+                    badge.classList.remove('hidden');
+                }
+            }).catch(() => {});
+        {% endif %}
     </script>
 
     <!-- ŞİFRE DEĞİŞTİR MODALI -->

@@ -1,4 +1,4 @@
-﻿{% extends "shared/layout.html" %}
+{% extends "shared/layout.html" %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto space-y-4">
@@ -217,6 +217,11 @@
                         class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-black text-xs transition whitespace-nowrap shadow-sm flex-shrink-0">
                         <i class="fa-solid fa-check text-[10px]"></i> Onayla
                     </button>
+                    <button type="button" onclick="openMoveModal({{ sunum.SunumID }}, {{ sunum.HaftaNo }}, '{{ sunum.KonuAdi }}', '{{ secili_bolum.OgretimTuru }}')"
+                        class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl font-black text-xs transition flex items-center gap-1.5 whitespace-nowrap shadow-sm flex-shrink-0"
+                        title="Haftay\u0131 de\u011fi\u015ftir">
+                        <i class="fa-solid fa-arrows-up-down-left-right text-[10px]"></i>
+                    </button>
                 </form>
 
                 {% else %}
@@ -272,10 +277,91 @@
     {% endif %}{# end secili_bolum #}
 
 </div>
+
+
+{# ===== HAFTA TAŞIMA MODALI ===== #}
+{% if secili_bolum %}
+<div id="moveModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm" onclick="closeMoveModal(event)">
+    <div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm mx-4 transform transition-all scale-95 opacity-0"
+         id="moveModalContent" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-black text-gray-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-arrows-up-down-left-right text-amber-600"></i>
+                Konuyu Taşı
+            </h3>
+            <button onclick="closeMoveModal()" class="text-gray-400 hover:text-gray-600 transition p-1">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 mb-4">
+            <p class="text-[10px] text-gray-400 font-black uppercase tracking-wider mb-1">Taşınacak Konu</p>
+            <p class="font-black text-gray-700 text-sm" id="moveKonuAdi">—</p>
+            <p class="text-[10px] text-gray-400 mt-1">Mevcut hafta: <span class="font-black text-gray-600" id="moveCurrentHafta">—</span></p>
+        </div>
+        <form action="/hoca/move_konu" method="POST">
+            <input type="hidden" name="sunum_id" id="moveSunumId">
+            <input type="hidden" name="tur" id="moveTur">
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Hedef Hafta</label>
+            <div class="grid grid-cols-5 gap-1.5 mb-4">
+                {% for w in range(1, 16) %}
+                <button type="button" onclick="selectWeek(this, {{ w }})"
+                        class="week-btn w-full h-10 rounded-xl font-black text-sm border-2 border-gray-200 hover:border-amber-400 hover:bg-amber-50 text-gray-600 transition flex items-center justify-center"
+                        data-week="{{ w }}">{{ w }}</button>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="yeni_hafta_no" id="moveTargetHafta" required>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeMoveModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-3 rounded-xl font-black text-xs transition">İptal</button>
+                <button type="submit" id="moveSaveBtn" disabled class="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-xl font-black text-xs transition shadow-lg shadow-amber-200 disabled:shadow-none">
+                    <i class="fa-solid fa-check mr-1"></i>Taşı
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<style>
+    .week-btn.selected { border-color: #f59e0b !important; background: #f59e0b !important; color: white !important; box-shadow: 0 4px 12px rgba(245,158,11,0.3); }
+    .week-btn.current { border-color: #94a3b8 !important; background: #f1f5f9 !important; color: #64748b !important; pointer-events: none; opacity: 0.5; }
+</style>
+
 <script>
     function toggleDetails(id) {
         document.getElementById(id).classList.toggle('hidden');
     }
+
+    let currentMoveHafta = 0;
+    function openMoveModal(sunumId, hafta, konuAdi, tur) {
+        currentMoveHafta = hafta;
+        document.getElementById('moveSunumId').value = sunumId;
+        document.getElementById('moveTur').value = tur;
+        document.getElementById('moveKonuAdi').textContent = konuAdi;
+        document.getElementById('moveCurrentHafta').textContent = hafta;
+        document.getElementById('moveTargetHafta').value = '';
+        document.getElementById('moveSaveBtn').disabled = true;
+        document.querySelectorAll('.week-btn').forEach(btn => {
+            btn.classList.remove('selected', 'current');
+            if (parseInt(btn.dataset.week) === hafta) btn.classList.add('current');
+        });
+        const modal = document.getElementById('moveModal');
+        const content = document.getElementById('moveModalContent');
+        modal.classList.remove('hidden'); modal.style.display = 'flex';
+        requestAnimationFrame(() => { content.classList.remove('scale-95','opacity-0'); content.classList.add('scale-100','opacity-100'); });
+    }
+    function closeMoveModal(e) {
+        if (e && e.target !== document.getElementById('moveModal')) return;
+        const content = document.getElementById('moveModalContent');
+        content.classList.remove('scale-100','opacity-100'); content.classList.add('scale-95','opacity-0');
+        setTimeout(() => { document.getElementById('moveModal').style.display='none'; document.getElementById('moveModal').classList.add('hidden'); }, 200);
+    }
+    function selectWeek(btn, week) {
+        document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('moveTargetHafta').value = week;
+        document.getElementById('moveSaveBtn').disabled = false;
+    }
+
     window.addEventListener('load', function () {
         if (window.location.hash) {
             const el = document.querySelector(window.location.hash);

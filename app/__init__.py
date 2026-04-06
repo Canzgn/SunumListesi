@@ -44,6 +44,7 @@ def create_app(config_class=Config):
     from app.blueprints.api import api_bp
     from app.blueprints.export import export_bp
     from app.blueprints.duyuru import duyuru_bp
+    from app.blueprints.mesaj import mesaj_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix='/admin')
@@ -53,6 +54,7 @@ def create_app(config_class=Config):
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(export_bp)
     app.register_blueprint(duyuru_bp)
+    app.register_blueprint(mesaj_bp, url_prefix='/mesaj')
 
     # --- Güvenlik header'ları ---
     @app.after_request

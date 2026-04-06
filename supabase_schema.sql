@@ -177,5 +177,22 @@ CREATE POLICY "backend_full_access" ON Hocalar FOR ALL TO CURRENT_USER USING (tr
 CREATE POLICY "backend_full_access" ON HocaBolumler FOR ALL TO CURRENT_USER USING (true) WITH CHECK (true);
 CREATE POLICY "backend_full_access" ON SoruKontrolculeri FOR ALL TO CURRENT_USER USING (true) WITH CHECK (true);
 
+-- Mesajlaşma Sistemi
+CREATE TABLE IF NOT EXISTS Mesajlar (
+    MesajID SERIAL PRIMARY KEY,
+    GonderenRol VARCHAR(20) NOT NULL,       -- 'student', 'admin', 'hoca', 'kontrolcu'
+    GonderenID INT NOT NULL,
+    GonderenAdi VARCHAR(255),
+    AliciRol VARCHAR(20) NOT NULL,           -- 'admin', 'hoca'
+    AliciID INT,                             -- NULL ise tüm admin/hocaya
+    Konu VARCHAR(255) NOT NULL,
+    Icerik TEXT NOT NULL,
+    Okundu BOOLEAN DEFAULT FALSE,
+    GonderimTarihi TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE Mesajlar ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "backend_full_access" ON Mesajlar FOR ALL TO CURRENT_USER USING (true) WITH CHECK (true);
+
 -- ─── BAŞLANGIÇ VERİSİ ────────────────────────────────────────────────────────
 -- Tüm veriler seed_data.sql dosyasından yüklenir (docker-entrypoint-initdb.d/02_seed_data.sql).
