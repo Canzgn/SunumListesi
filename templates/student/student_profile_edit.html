@@ -1,0 +1,102 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-xl mx-auto space-y-6">
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-blue-500">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Profil Düzenle</h1>
+                <p class="text-xs text-gray-500 font-medium mt-1">{{ student.OgrenciNo }} — {{ student.AdSoyad }}</p>
+            </div>
+            <a href="{{ url_for('student.student_panel') }}"
+               class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition">
+                <i class="fa-solid fa-arrow-left"></i> Panele Dön
+            </a>
+        </div>
+    </div>
+
+    {# FLASH #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# PROFİL FOTOĞRAFI #}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-black text-gray-700 text-sm uppercase tracking-widest mb-4">
+            <i class="fa-solid fa-camera text-blue-500 mr-2"></i>Profil Fotoğrafı
+        </h2>
+        {% if student.KimlikFoto %}
+        <div class="mb-4 flex items-center gap-4">
+            <img src="/static/uploads/kimlikler/{{ student.KimlikFoto }}"
+                 class="w-20 h-20 rounded-2xl object-cover border-2 border-gray-200" alt="Profil">
+            <p class="text-xs text-gray-500 font-bold">Mevcut fotoğraf</p>
+        </div>
+        {% endif %}
+        <form action="{{ url_for('student.student_profile_edit') }}" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="change_photo">
+            <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-blue-400 transition cursor-pointer"
+                 onclick="document.getElementById('foto_input').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-300 mb-2"></i>
+                <p class="text-xs text-gray-400 font-bold">PNG, JPG veya WEBP — Max 5MB</p>
+                <p id="foto_label" class="text-[10px] text-gray-300 mt-1">Tıklayarak dosya seçin</p>
+            </div>
+            <input type="file" id="foto_input" name="kimlik_foto" accept="image/*" class="hidden"
+                   onchange="document.getElementById('foto_label').textContent = this.files[0]?.name || ''">
+            <button type="submit"
+                    class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow-sm">
+                <i class="fa-solid fa-upload mr-2"></i>Fotoğrafı Güncelle
+            </button>
+        </form>
+    </div>
+
+    {# ŞİFRE DEĞİŞTİRME #}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-black text-gray-700 text-sm uppercase tracking-widest mb-4">
+            <i class="fa-solid fa-lock text-purple-500 mr-2"></i>Şifre Değiştir
+        </h2>
+        <form action="{{ url_for('student.student_profile_edit') }}" method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="change_password">
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Mevcut Şifre</label>
+                <div class="relative">
+                    <input type="password" name="old_password" id="old_pw" required
+                           class="w-full border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none focus:border-purple-400 pr-10">
+                    <button type="button" onclick="togglePw('old_pw','e1')"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <i id="e1" class="fa-solid fa-eye text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Yeni Şifre (en az 6 karakter)</label>
+                <input type="password" name="new_password" required minlength="6"
+                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none focus:border-purple-400">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Yeni Şifre (tekrar)</label>
+                <input type="password" name="new_password2" required minlength="6"
+                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none focus:border-purple-400">
+            </div>
+            <button type="submit"
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow-sm">
+                <i class="fa-solid fa-key mr-2"></i>Şifreyi Güncelle
+            </button>
+        </form>
+    </div>
+
+</div>
+<script>
+function togglePw(inputId, iconId) {
+    const i = document.getElementById(inputId);
+    const e = document.getElementById(iconId);
+    if (i.type === 'password') { i.type = 'text'; e.className = 'fa-solid fa-eye-slash text-sm'; }
+    else { i.type = 'password'; e.className = 'fa-solid fa-eye text-sm'; }
+}
+</script>
+{% endblock %}

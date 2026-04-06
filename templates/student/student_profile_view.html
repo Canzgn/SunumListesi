@@ -1,0 +1,110 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Profil Başlığı -->
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-indigo-500">
+        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">{{ student.AdSoyad }}</h1>
+                <p class="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Öğrenci Numarası: {{ student.OgrenciNo }} | {{ student.OgretimTuru }}</p>
+            </div>
+            <div>
+                {% if student.IsApproved %}
+                    <span class="bg-green-100 text-green-700 font-black px-4 py-2 rounded-xl text-sm uppercase"><i class="fa-solid fa-check mr-2"></i> Onaylı Öğrenci</span>
+                {% else %}
+                    <span class="bg-orange-100 text-orange-700 font-black px-4 py-2 rounded-xl text-sm uppercase"><i class="fa-solid fa-clock mr-2"></i> Beklemede</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Kesin Atanan Sunum -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight mb-4 border-b pb-2"><i class="fa-solid fa-thumbtack text-indigo-500 mr-2"></i> Kesin Atanan Sunum Görevi</h2>
+            {% if assignment %}
+                <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-widest">
+                        Kesinleşti
+                    </div>
+                    <h3 class="font-black text-gray-800 text-lg mb-1"><a href="/student/topic/{{ assignment.SunumID }}" class="hover:underline text-indigo-600">{{ assignment.KonuAdi }}</a></h3>
+                    <div class="flex gap-3 text-xs font-bold">
+                        <span class="bg-white px-2 py-1 rounded-md text-gray-600 border border-indigo-100"><i class="fa-solid fa-calendar-day mr-1"></i> Hafta {{ assignment.HaftaNo }}</span>
+                        <span class="bg-white px-2 py-1 rounded-md text-gray-600 border border-indigo-100"><i class="fa-solid fa-users mr-1"></i> {{ assignment.OgretimTuru }}</span>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500 italic font-bold">Henüz kesinleşmiş bir sunum görevi bulunmuyor.</p>
+            {% endif %}
+        </div>
+
+        <!-- Soru Soracağı Konular -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight mb-4 border-b pb-2"><i class="fa-solid fa-comment-dots text-emerald-500 mr-2"></i> Soru Soracağı Konular</h2>
+            {% if questions %}
+                <ul class="space-y-3">
+                    {% for q in questions %}
+                        <li class="p-4 rounded-xl border {% if q.IsApproved %}bg-green-50 border-green-200{% elif q.RejectReason %}bg-red-50 border-red-200{% else %}bg-orange-50 border-orange-200{% endif %}">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-gray-800 text-sm"><a href="/student/topic/{{ q.SunumID }}" class="hover:underline text-indigo-600">{{ q.KonuAdi }}</a></h4>
+                                <span class="text-[10px] font-black px-2 py-1 rounded-full uppercase
+                                    {% if q.IsApproved %}bg-green-200 text-green-800
+                                    {% elif q.RejectReason %}bg-red-200 text-red-800
+                                    {% else %}bg-orange-200 text-orange-800{% endif %}">
+                                    {% if q.IsApproved %}Onaylandı
+                                    {% elif q.RejectReason %}Reddedildi/Geçersiz
+                                    {% else %}Beklemede{% endif %}
+                                </span>
+                            </div>
+                            <div class="text-xs text-gray-500 flex gap-3">
+                                <span><i class="fa-solid fa-calendar-day mr-1"></i> Hafta {{ q.HaftaNo }}</span>
+                                <span><i class="fa-regular fa-clock mr-1"></i> {{ q.ZamanDamgasi }}</span>
+                            </div>
+                            {% if q.RejectReason %}
+                                <div class="mt-2 text-xs font-bold text-red-600 bg-red-100 p-2 rounded-lg"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Gerekçe: {{ q.RejectReason }}</div>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-sm text-gray-500 italic font-bold">Herhangi bir soru sorma başvurusu veya ataması yok.</p>
+            {% endif %}
+        </div>
+
+        <!-- Sunum Konu Başvuruları -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 lg:col-span-2">
+            <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight mb-4 border-b pb-2"><i class="fa-solid fa-list-ul text-blue-500 mr-2"></i> Sunum Konu Başvuruları</h2>
+            {% if applications %}
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-xs uppercase tracking-widest font-black">
+                                <th class="p-3 rounded-tl-xl">Konu</th>
+                                <th class="p-3">Hafta</th>
+                                <th class="p-3">Tür</th>
+                                <th class="p-3 rounded-tr-xl">Başvuru Zamanı</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for app in applications %}
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="p-3 text-sm font-bold text-gray-800"><a href="/student/topic/{{ app.SunumID }}" class="hover:underline text-indigo-600">{{ app.KonuAdi }}</a></td>
+                                    <td class="p-3 text-sm text-gray-500">{{ app.HaftaNo }}</td>
+                                    <td class="p-3 text-sm text-gray-500">{{ app.OgretimTuru }}</td>
+                                    <td class="p-3 text-sm text-gray-500">{{ app.ZamanDamgasi }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-sm text-gray-500 italic font-bold">Hiçbir konuya sunum yapmak için başvurulmamış.</p>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}

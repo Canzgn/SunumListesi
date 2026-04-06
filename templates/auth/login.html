@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunum Sistemi — Giriş</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #4f46e5 100%); }
+        .bubble { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.06); }
+        .input-field { transition: all 0.2s; }
+        .input-field:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+        .tab-active { background: white; color: #1d4ed8; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .tab-inactive { color: #6b7280; }
+    </style>
+</head>
+<body class="min-h-screen flex">
+    <!-- Sol Panel — Marka -->
+    <div class="hidden lg:flex w-5/12 gradient-bg flex-col items-center justify-center p-12 relative overflow-hidden">
+        <div class="bubble w-64 h-64 top-[-40px] left-[-40px]"></div>
+        <div class="bubble w-48 h-48 bottom-20 right-[-30px]"></div>
+        <div class="bubble w-24 h-24 top-1/3 right-1/4"></div>
+        <div class="bubble w-16 h-16 bottom-1/3 left-1/4"></div>
+        <div class="relative text-center text-white max-w-sm">
+            <div class="w-20 h-20 bg-white/15 rounded-3xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-white/20">
+                <i class="fa-solid fa-chalkboard-user text-4xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-black tracking-tighter leading-tight mb-3">
+                Web Programlama<br>Sunum Sistemi
+            </h1>
+            <p class="text-blue-200 text-sm leading-relaxed mb-10">
+                Konu seçimi, soru başvurusu ve sunum takvimini tek platformdan yönetin.
+            </p>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                    <p class="text-3xl font-black">60</p>
+                    <p class="text-[10px] text-blue-200 font-bold uppercase tracking-wider mt-1">Konu</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                    <p class="text-3xl font-black">240</p>
+                    <p class="text-[10px] text-blue-200 font-bold uppercase tracking-wider mt-1">Öğrenci</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                    <p class="text-3xl font-black">3</p>
+                    <p class="text-[10px] text-blue-200 font-bold uppercase tracking-wider mt-1">Soru Hakkı</p>
+                </div>
+            </div>
+            <div class="mt-8 space-y-3 text-left">
+                <div class="flex items-center gap-3 text-blue-100 text-sm">
+                    <div class="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-check text-xs text-green-300"></i>
+                    </div>
+                    Google Forms'un yerini alan dijital sistem
+                </div>
+                <div class="flex items-center gap-3 text-blue-100 text-sm">
+                    <div class="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-check text-xs text-green-300"></i>
+                    </div>
+                    Gerçek zamanlı kuyruk takibi
+                </div>
+                <div class="flex items-center gap-3 text-blue-100 text-sm">
+                    <div class="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-check text-xs text-green-300"></i>
+                    </div>
+                    Otomatik atama ve onay yönetimi
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sağ Panel — Form -->
+    <div class="flex-1 flex items-center justify-center p-6 bg-gray-50">
+        <div class="w-full max-w-md">
+            <!-- Mobil logo -->
+            <div class="lg:hidden text-center mb-8">
+                <div class="w-14 h-14 gradient-bg rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-chalkboard-user text-2xl text-white"></i>
+                </div>
+                <h2 class="text-2xl font-black text-gray-800 tracking-tighter">Sunum Sistemi</h2>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+                <h2 class="text-2xl font-black text-gray-800 tracking-tighter mb-1">Giriş Yap</h2>
+                <p class="text-gray-400 text-xs font-medium mb-6">Öğrenci numaranız veya admin adınızla giriş yapın</p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm font-bold border border-red-200 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-exclamation flex-shrink-0"></i>
+                        <span>{{ message }}</span>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                <!-- Rol sekmeleri -->
+                <div class="flex bg-gray-100 p-1 rounded-2xl mb-6 gap-1">
+                    <button type="button" onclick="setRole('student')" id="btn-student"
+                        class="flex-1 py-2.5 rounded-xl font-black text-xs transition tab-active">
+                        <i class="fa-solid fa-user-graduate mr-1.5"></i>Öğrenci
+                    </button>
+                    <button type="button" onclick="setRole('admin')" id="btn-admin"
+                        class="flex-1 py-2.5 rounded-xl font-black text-xs transition tab-inactive">
+                        <i class="fa-solid fa-user-shield mr-1.5"></i>Admin
+                    </button>
+                    <button type="button" onclick="setRole('hoca')" id="btn-hoca"
+                        class="flex-1 py-2.5 rounded-xl font-black text-xs transition tab-inactive">
+                        <i class="fa-solid fa-chalkboard-user mr-1.5"></i>Öğretmen
+                    </button>
+                    <button type="button" onclick="setRole('kontrolcu')" id="btn-kontrolcu"
+                        class="flex-1 py-2.5 rounded-xl font-black text-xs transition tab-inactive">
+                        <i class="fa-solid fa-clipboard-check mr-1.5"></i>Soru Kont.
+                    </button>
+                </div>
+
+                <form action="/login" method="POST" class="space-y-4" autocomplete="off">
+                    <input type="hidden" name="role" id="role-input" value="student">
+
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5" id="username-label">Öğrenci Numarası</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-id-card absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                            <input type="text" name="username" required placeholder="2021010001" id="username-input"
+                                class="input-field w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 focus:bg-white">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Şifre</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                            <input type="password" name="password" id="pw-input" placeholder="••••••••"
+                                class="input-field w-full pl-10 pr-11 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 focus:bg-white">
+                            <button type="button" onclick="togglePw()" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
+                                <i class="fa-solid fa-eye text-sm" id="pw-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                        class="w-full gradient-bg text-white py-3.5 rounded-xl font-black text-sm transition hover:opacity-90 active:scale-[0.98] shadow-lg shadow-blue-200">
+                        Giriş Yap &nbsp;<i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </form>
+
+                <div class="mt-5 text-center">
+                    <p class="text-xs text-gray-400 font-medium">
+                        İlk kez mi kullanıyorsunuz?
+                        <a href="/register" class="text-blue-600 font-black hover:underline">Kayıt Ol</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setRole(role) {
+            const roles = ['student','admin','hoca','kontrolcu'];
+            roles.forEach(r => {
+                const btn = document.getElementById('btn-' + r);
+                btn.className = 'flex-1 py-2.5 rounded-xl font-black text-xs transition ' + (r === role ? 'tab-active' : 'tab-inactive');
+            });
+            document.getElementById('role-input').value = role;
+            const label = document.getElementById('username-label');
+            const input = document.getElementById('username-input');
+            const labels = {
+                student: ['Öğrenci Numarası', '2021010001'],
+                admin: ['Admin Kullanıcı Adı', 'admin'],
+                hoca: ['Öğretmen Kullanıcı Adı', 'hoca_kullanici'],
+                kontrolcu: ['Soru Kont. Kullanıcı Adı', 'kontrolcu']
+            };
+            label.textContent = labels[role][0];
+            input.placeholder = labels[role][1];
+        }
+        function togglePw() {
+            const i = document.getElementById('pw-input');
+            const e = document.getElementById('pw-eye');
+            if (i.type === 'password') { i.type = 'text'; e.className = 'fa-solid fa-eye-slash text-sm'; }
+            else { i.type = 'password'; e.className = 'fa-solid fa-eye text-sm'; }
+        }
+    </script>
+</body>
+</html>

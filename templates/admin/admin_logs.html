@@ -1,0 +1,67 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-slate-600">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">İşlem Logları</h1>
+                <p class="text-xs text-gray-500 font-medium mt-1">Son 200 kayıt gösterilmektedir.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        {% if logs %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
+                        <th class="p-3 font-black">Zaman</th>
+                        <th class="p-3 font-black">Eylem</th>
+                        <th class="p-3 font-black">Konu</th>
+                        <th class="p-3 font-black">Yapan</th>
+                        <th class="p-3 font-black">Detay</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for log in logs %}
+                    <tr class="hover:bg-gray-50 transition text-sm">
+                        <td class="p-3 font-mono text-[11px] text-gray-500 whitespace-nowrap">{{ log.Zaman }}</td>
+                        <td class="p-3">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase
+                                {% if log.Eylem == 'ONAY' %}bg-emerald-100 text-emerald-700
+                                {% elif log.Eylem == 'ONAY_KALDIR' %}bg-red-100 text-red-700
+                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                {% if log.Eylem == 'ONAY' %}<i class="fa-solid fa-check"></i>
+                                {% elif log.Eylem == 'ONAY_KALDIR' %}<i class="fa-solid fa-rotate-left"></i>
+                                {% else %}<i class="fa-solid fa-circle-info"></i>{% endif %}
+                                {{ log.Eylem }}
+                            </span>
+                        </td>
+                        <td class="p-3 text-xs font-bold text-gray-700 max-w-[200px]">
+                            <span class="line-clamp-1">{{ log.KonuAdi or '—' }}</span>
+                            {% if log.SunumID %}
+                            <span class="text-[10px] text-gray-400 font-mono">#{{ log.SunumID }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3 text-xs font-bold text-gray-600">{{ log.YapaAdi }}</td>
+                        <td class="p-3 text-xs text-gray-500 max-w-[180px]">
+                            <span class="line-clamp-1">{{ log.Detay or '—' }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <i class="fa-solid fa-scroll text-gray-300 text-5xl mb-4"></i>
+            <p class="font-black text-gray-400">Henüz işlem logu yok</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

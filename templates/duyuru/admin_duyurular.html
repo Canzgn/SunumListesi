@@ -1,0 +1,111 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+    {# BAŞLIK #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-yellow-500">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Duyurular</h1>
+                <p class="text-xs text-gray-500 font-medium mt-1">Öğrencilere ve kullanıcılara duyuru yayınlayın.</p>
+            </div>
+        </div>
+    </div>
+
+    {# FLASH #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# YENİ DUYURU FORMU #}
+    <details class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden" open>
+        <summary class="p-5 font-black text-gray-700 cursor-pointer flex items-center gap-2 hover:bg-gray-50 transition">
+            <i class="fa-solid fa-plus-circle text-yellow-500"></i> Yeni Duyuru Ekle
+        </summary>
+        <form action="{{ url_for('duyuru.admin_duyuru_ekle') }}" method="POST" class="p-5 border-t border-gray-100 space-y-4">
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Başlık *</label>
+                <input name="baslik" type="text" placeholder="Duyuru başlığı..." required
+                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none focus:border-yellow-400">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">İçerik</label>
+                <textarea name="icerik" rows="4" placeholder="Duyuru detayları..."
+                          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-sm outline-none focus:border-yellow-400 resize-none"></textarea>
+            </div>
+            <div class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Gösterilecek Kullanıcılar</label>
+                    <select name="gosterilecek_roller"
+                            class="border border-gray-200 rounded-xl px-3 py-2.5 font-bold text-sm outline-none focus:border-yellow-400 bg-white">
+                        <option value="all">Herkes</option>
+                        <option value="student">Sadece Öğrenciler</option>
+                        <option value="hoca">Sadece Öğretmenler</option>
+                    </select>
+                </div>
+                <button type="submit"
+                        class="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2.5 rounded-xl font-black text-sm transition shadow-sm">
+                    <i class="fa-solid fa-bullhorn"></i> Yayınla
+                </button>
+            </div>
+        </form>
+    </details>
+
+    {# DUYURU LİSTESİ #}
+    <div class="space-y-3">
+        {% if duyurular %}
+        {% for d in duyurular %}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase
+                                {% if d.GosterilecekRoller == 'student' %}bg-blue-100 text-blue-700
+                                {% elif d.GosterilecekRoller == 'hoca' %}bg-purple-100 text-purple-700
+                                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                <i class="fa-solid fa-users text-[8px]"></i>
+                                {% if d.GosterilecekRoller == 'student' %}Öğrenciler
+                                {% elif d.GosterilecekRoller == 'hoca' %}Öğretmenler
+                                {% else %}Herkes{% endif %}
+                            </span>
+                            <span class="text-[10px] text-gray-400 font-bold">
+                                <i class="fa-solid fa-clock mr-1"></i>
+                                {{ d.OlusturmaTarihi.strftime('%d.%m.%Y %H:%M') if d.OlusturmaTarihi else '—' }}
+                            </span>
+                            <span class="text-[10px] text-gray-400 font-bold">
+                                <i class="fa-solid fa-user mr-1"></i>{{ d.YayinlayaciAdi or '—' }}
+                            </span>
+                        </div>
+                        <h3 class="font-black text-gray-800 text-base">{{ d.Baslik }}</h3>
+                        {% if d.Icerik %}
+                        <p class="text-sm text-gray-600 font-medium mt-1 whitespace-pre-line">{{ d.Icerik }}</p>
+                        {% endif %}
+                    </div>
+                    <form action="{{ url_for('duyuru.admin_duyuru_sil', duyuru_id=d.DuyuruID) }}" method="POST"
+                          onsubmit="return confirm('Bu duyuru silinsin mi?')">
+                        <button type="submit"
+                                class="flex-shrink-0 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-xl font-black text-xs transition">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-sm p-12 text-center border border-dashed border-gray-200">
+            <i class="fa-solid fa-bullhorn text-gray-300 text-5xl mb-4"></i>
+            <p class="font-black text-gray-400">Henüz duyuru yok</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

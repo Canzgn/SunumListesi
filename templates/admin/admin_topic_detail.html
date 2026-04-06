@@ -1,0 +1,109 @@
+﻿{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="bg-white p-8 rounded-3xl shadow-xl border-b-8 border-blue-600">
+        <h1 class="text-3xl font-black text-gray-800 tracking-tighter">{{ topic.KonuAdi }}</h1>
+        <p class="text-blue-600 font-bold uppercase text-xs">{{ topic.HaftaNo }}. Hafta - {{ topic.OgretimTuru }}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+            <h2 class="text-xs font-black text-gray-400 uppercase mb-4 tracking-widest">Atama Kontrolü</h2>
+            {% if atananlar %}
+                <div class="bg-green-50 p-4 rounded-xl border border-green-200 mb-4">
+                    <p class="text-green-800 font-black">Şu an Atanan: 
+                        {% for a in atananlar %}
+                        <a href="/admin/student/{{ a.OgrenciNo }}" class="underline">{{ a.OgrenciNo }}</a>{% if not loop.last %} & {% endif %}
+                        {% endfor %}
+                    </p>
+                </div>
+                <form action="/admin/clear_assignment" method="POST">
+                    <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
+                    <input type="hidden" name="tur" value="{{ topic.OgretimTuru }}">
+                    <button type="submit" class="w-full bg-red-500 text-white py-3 rounded-xl font-black text-xs hover:bg-red-600 transition">ONAYI SİL VE BOŞA ÇIKAR</button>
+                </form>
+            {% else %}
+                <p class="text-orange-400 font-bold italic mb-4">Bu konu henüz kimseye atanmadı.</p>
+                <form action="/admin/assign" method="POST" class="space-y-3">
+                    <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
+                    <input type="hidden" name="tur" value="{{ topic.OgretimTuru }}">
+                    <select name="basvuru_id" class="w-full p-3 border-2 rounded-xl font-bold text-sm bg-gray-50">
+                        {% for b in basvurular %}
+                        <option value="{{ b.BasvuruID }}">{{ b.OncelikSirasi }}. Tercih: {{ b.Ogrenci1No }} & {{ b.Ogrenci2No }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs hover:bg-blue-700 transition">SEÇİLEN GRUBU ONAYLA</button>
+                </form>
+            {% endif %}
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+            <div class="flex flex-col mb-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-black text-gray-400 uppercase tracking-widest">Soru Başvuruları</h2>
+                    <span class="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-1 rounded-lg">{{ soru_soranlar|selectattr('IsApproved')|list|length }}/6 Onaylı</span>
+                </div>
+                <p class="text-[10px] text-gray-400 font-bold mt-1">Öğrenci derse katılmazsa "Sormadı" butonuna tıklayarak hakkını iptal edebilirsiniz.</p>
+            </div>
+
+            {% if soru_soranlar %}
+                <div class="space-y-3">
+                    {% for s in soru_soranlar %}
+                    {# Kart Rengi ve Durumu #}
+                    <div class="flex flex-col p-4 rounded-xl border transition
+                        {% if s.IsApproved %}bg-emerald-50 border-emerald-200
+                        {% elif s.RejectReason %}bg-red-50 border-red-200
+                        {% else %}bg-gray-50 border-gray-200{% endif %}">
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <a href="/admin/student/{{ s.OgrenciNo }}" class="font-black text-sm 
+                                    {% if s.IsApproved %}text-emerald-900{% elif s.RejectReason %}text-red-900 line-through opacity-70{% else %}text-gray-700{% endif %} hover:underline">
+                                    {{ s.OgrenciNo }} - {{ s.AdSoyad }}
+                                </a>
+                                <span class="text-[10px] font-mono text-gray-500 mt-1">
+                                    <i class="fa-regular fa-clock"></i> {{ s.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if s.ZamanDamgasi else '--' }}
+                                </span>
+                            </div>
+                            
+                            <div class="flex items-center gap-2">
+                                {% if s.IsApproved %}
+                                    <span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-1 rounded uppercase tracking-wider hidden md:inline-block"><i class="fa-solid fa-check"></i> Onaylı</span>
+                                    
+                                    <form action="/admin/topic/update_question_status" method="POST" class="inline">
+                                        <input type="hidden" name="basvuru_id" value="{{ s.SoruBasvuruID }}">
+                                        <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
+                                        <input type="hidden" name="action" value="reject">
+                                        <input type="hidden" name="reject_reason" value="Sunuma katılmadı veya soru sormadı.">
+                                        <button type="submit" onclick="return confirm('Öğrenciyi Sormadı/Katılmadı olarak işaretlemek istediğinize emin misiniz? Öğrencinin soru hakkı iade edilecek.')" class="bg-red-100 text-red-700 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 tooltip-btn" title="İptal edip soru hakkını iade et">
+                                            <i class="fa-solid fa-user-xmark"></i> Sormadı
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    {% if s.RejectReason %}
+                                        <span class="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded uppercase tracking-wider hidden md:inline-block" title="{{ s.RejectReason }}"><i class="fa-solid fa-xmark"></i> İptal</span>
+                                    {% else %}
+                                        <span class="bg-gray-400 text-white text-[9px] font-black px-2 py-1 rounded uppercase tracking-wider hidden md:inline-block"><i class="fa-solid fa-hourglass-half"></i> Bekliyor</span>
+                                    {% endif %}
+                                    
+                                    <form action="/admin/topic/update_question_status" method="POST" class="inline">
+                                        <input type="hidden" name="basvuru_id" value="{{ s.SoruBasvuruID }}">
+                                        <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
+                                        <input type="hidden" name="action" value="approve">
+                                        <button type="submit" class="bg-emerald-100 text-emerald-800 hover:bg-emerald-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 tooltip-btn" title="Öğrenciye tekrar hak ver (Onayla)">
+                                            <i class="fa-solid fa-check-double"></i> Onayla
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-300 italic font-bold text-sm text-center py-8">Henüz soru başvurusu yok.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunum Sistemi — Kayıt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #4f46e5 100%); }
+        .input-field:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+        .tab-active { background: white; color: #1d4ed8; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .tab-inactive { color: #6b7280; }
+        .tur-active { border-color: #1d4ed8; background: #eff6ff; color: #1e40af; }
+        .tur-inactive { border-color: #e5e7eb; background: white; color: #6b7280; }
+        #photo-preview { display: none; }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div class="w-full max-w-lg">
+
+        <!-- Başlık -->
+        <div class="text-center mb-6">
+            <a href="/login" class="inline-flex items-center gap-2 text-blue-600 text-xs font-bold hover:underline mb-4">
+                <i class="fa-solid fa-arrow-left"></i> Girişe Dön
+            </a>
+            <div class="w-14 h-14 gradient-bg rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-user-plus text-xl text-white"></i>
+            </div>
+            <h2 class="text-2xl font-black text-gray-800 tracking-tighter">Sisteme Kayıt Ol</h2>
+            <p class="text-gray-400 text-xs mt-1">Bilgilerinizi girerek kayıt oluşturun</p>
+        </div>
+
+        <!-- Kart -->
+        <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="mb-4 p-3 rounded-xl {% if category == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %} text-sm font-bold flex items-center gap-2">
+                    <i class="fa-solid {% if category == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} flex-shrink-0"></i>
+                    <span>{{ message }}</span>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <!-- Kayıt türü -->
+            <div class="flex bg-gray-100 p-1 rounded-2xl mb-6 gap-1">
+                <button type="button" onclick="setRegType('student')" id="btn-student"
+                    class="flex-1 py-2.5 rounded-xl font-black text-xs transition tab-active">
+                    <i class="fa-solid fa-user-graduate mr-1.5"></i>Öğrenci
+                </button>
+                <button type="button" onclick="setRegType('admin')" id="btn-admin"
+                    class="flex-1 py-2.5 rounded-xl font-black text-xs transition tab-inactive">
+                    <i class="fa-solid fa-user-shield mr-1.5"></i>Admin Başvurusu
+                </button>
+            </div>
+
+            <form action="/register" method="POST" enctype="multipart/form-data" class="space-y-4" autocomplete="off">
+                <input type="hidden" name="reg_type" id="reg_type" value="student">
+
+                <!-- Öğrenci No -->
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5" id="no-label">Öğrenci Numarası</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-id-badge absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" name="ogrenci_no" id="ogrenci_no_input"
+                            required
+                            placeholder="2021010001"
+                            oninput="lookupStudent(this.value)"
+                            class="input-field w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 focus:bg-white transition">
+                        <span id="lookup-badge" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg"></span>
+                    </div>
+                    <p id="lookup-name" class="mt-1 text-xs text-emerald-600 font-bold hidden"></p>
+                </div>
+
+                <!-- Ad Soyad (sadece öğrenci için) -->
+                <div id="ad-soyad-div">
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Ad Soyad</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" name="ad_soyad" id="ad_soyad_input" placeholder="Ad Soyad"
+                            class="input-field w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 focus:bg-white transition">
+                    </div>
+                </div>
+
+                <!-- Şifre -->
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Şifre</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="password" name="password" id="reg-pw" placeholder="En az 6 karakter" required
+                            class="input-field w-full pl-10 pr-11 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 focus:bg-white transition">
+                        <button type="button" onclick="toggleRegPw()" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
+                            <i class="fa-solid fa-eye text-sm" id="reg-pw-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Öğretim türü (sadece öğrenci) -->
+                <div id="tur-div">
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Öğretim Türü</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="tur-active border-2 rounded-xl p-3 text-center font-black text-sm cursor-pointer transition" id="tur-orgün-label">
+                            <input type="radio" name="ogretim_turu" value="Örgün" class="hidden" id="tur-orgün" checked>
+                            <i class="fa-solid fa-sun mr-1.5 text-amber-500"></i>Örgün
+                        </label>
+                        <label class="tur-inactive border-2 rounded-xl p-3 text-center font-black text-sm cursor-pointer transition" id="tur-gece-label">
+                            <input type="radio" name="ogretim_turu" value="Gece" class="hidden" id="tur-gece">
+                            <i class="fa-solid fa-moon mr-1.5 text-indigo-500"></i>Gece
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Dönem & Bölüm seçimi (sadece öğrenci) -->
+                <div id="bolum-div">
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Dönem</label>
+                    <select name="donem_id" id="donem_select"
+                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50 mb-3"
+                        onchange="filterBolumler()">
+                        <option value="">— Dönem Seçin —</option>
+                        {% for d in donemler %}
+                            <option value="{{ d.DonemID }}" {% if d.Aktif %}selected{% endif %}>
+                                {{ d.DonemAdi }}{% if d.Aktif %} (Aktif){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Bölüm</label>
+                    <select name="bolum_id" id="bolum_select"
+                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50">
+                        <option value="">— Önce dönem seçin —</option>
+                        {% for b in bolumler %}
+                            <option value="{{ b.BolumID }}"
+                                data-donem="{{ b.DonemID }}"
+                                data-tur="{{ b.OgretimTuru }}">
+                                {{ b.BolumAdi }} ({{ b.OgretimTuru }}) — {{ b.DonemAdi }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-[10px] text-gray-400 mt-1">Bölümünüz listede yoksa admin ile iletişime geçin.</p>
+                </div>
+
+                <!-- Kimlik fotoğrafı (sadece öğrenci) -->
+                <div id="foto-div">
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Kimlik Fotoğrafı <span class="text-gray-300 font-normal">(isteğe bağlı)</span></label>
+                    <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-blue-400 transition cursor-pointer" onclick="document.getElementById('kimlik_foto').click()">
+                        <div id="foto-placeholder">
+                            <i class="fa-solid fa-camera text-2xl text-gray-300 mb-2"></i>
+                            <p class="text-xs text-gray-400 font-bold">PNG, JPG veya WEBP — Max 5MB</p>
+                            <p class="text-[10px] text-gray-300 mt-1">Tıklayarak dosya seçin</p>
+                        </div>
+                        <img id="photo-preview" class="mx-auto rounded-xl max-h-32 object-cover" alt="Önizleme">
+                    </div>
+                    <input type="file" name="kimlik_foto" id="kimlik_foto" accept="image/*" class="hidden" onchange="previewPhoto(this)">
+                </div>
+
+                <!-- Bölüm seçimi (sadece admin başvurusu) -->
+                <div id="admin-bolum-div" class="hidden">
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Başvuru Yapılacak Bölüm</label>
+                    <select name="admin_bolum_id" id="admin_bolum_select"
+                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-500 bg-gray-50">
+                        <option value="">— Bölüm Seçin —</option>
+                        {% for b in bolumler %}
+                            <option value="{{ b.BolumID }}">
+                                {{ b.BolumAdi }} ({{ b.OgretimTuru }}) — {{ b.DonemAdi }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-[10px] text-gray-400 mt-1">Hangi bölümde adminlik yapmak istediğinizi seçin.</p>
+                </div>
+
+                <button type="submit"
+                    class="w-full gradient-bg text-white py-3.5 rounded-xl font-black text-sm transition hover:opacity-90 active:scale-[0.98] shadow-lg shadow-blue-200 mt-2">
+                    Kayıt Talebi Gönder &nbsp;<i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-xs text-gray-400 mt-4">
+            Zaten üye misiniz? <a href="/login" class="text-blue-600 font-black hover:underline">Giriş Yap</a>
+        </p>
+
+    <script>
+        let lookupTimeout;
+        function lookupStudent(val) {
+            clearTimeout(lookupTimeout);
+            const badge = document.getElementById('lookup-badge');
+            const nameEl = document.getElementById('lookup-name');
+            const adInput = document.getElementById('ad_soyad_input');
+            if (val.length < 7) { badge.classList.add('hidden'); nameEl.classList.add('hidden'); return; }
+            lookupTimeout = setTimeout(() => {
+                fetch('/api/student_lookup?no=' + encodeURIComponent(val))
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.found) {
+                            badge.textContent = '✓ Bulundu';
+                            badge.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700';
+                            if (data.ad_soyad) {
+                                nameEl.textContent = data.ad_soyad;
+                                nameEl.classList.remove('hidden');
+                                adInput.value = data.ad_soyad;
+                                adInput.readOnly = true;
+                                adInput.classList.add('bg-emerald-50');
+                            }
+                        } else {
+                            badge.textContent = '✗ Bulunamadı';
+                            badge.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black px-2 py-1 rounded-lg bg-red-100 text-red-700';
+                            nameEl.classList.add('hidden');
+                            adInput.readOnly = false;
+                            adInput.classList.remove('bg-emerald-50');
+                        }
+                        badge.classList.remove('hidden');
+                    });
+            }, 500);
+        }
+
+        function setRegType(type) {
+            document.getElementById('reg_type').value = type;
+            const btnS = document.getElementById('btn-student');
+            const btnA = document.getElementById('btn-admin');
+            const adDiv = document.getElementById('ad-soyad-div');
+            const turDiv = document.getElementById('tur-div');
+            const bolumDiv = document.getElementById('bolum-div');
+            const fotoDiv = document.getElementById('foto-div');
+            const adminBolumDiv = document.getElementById('admin-bolum-div');
+            const noLabel = document.getElementById('no-label');
+            const noInput = document.getElementById('ogrenci_no_input');
+            if (type === 'student') {
+                btnS.className = 'flex-1 py-2.5 rounded-xl font-black text-xs transition tab-active';
+                btnA.className = 'flex-1 py-2.5 rounded-xl font-black text-xs transition tab-inactive';
+                adDiv.classList.remove('hidden');
+                turDiv.classList.remove('hidden');
+                bolumDiv.classList.remove('hidden');
+                fotoDiv.classList.remove('hidden');
+                adminBolumDiv.classList.add('hidden');
+                noLabel.textContent = 'Öğrenci Numarası';
+                noInput.placeholder = '2021010001';
+            } else {
+                btnA.className = 'flex-1 py-2.5 rounded-xl font-black text-xs transition tab-active';
+                btnS.className = 'flex-1 py-2.5 rounded-xl font-black text-xs transition tab-inactive';
+                adDiv.classList.add('hidden');
+                turDiv.classList.add('hidden');
+                bolumDiv.classList.add('hidden');
+                fotoDiv.classList.add('hidden');
+                adminBolumDiv.classList.remove('hidden');
+                noLabel.textContent = 'Admin Kullanıcı Adı';
+                noInput.placeholder = 'kullanici_adi';
+            }
+        }
+
+        function filterBolumler() {
+            const donemId = document.getElementById('donem_select').value;
+            const turRadio = document.querySelector('input[name="ogretim_turu"]:checked');
+            const tur = turRadio ? turRadio.value : '';
+            const select = document.getElementById('bolum_select');
+            const opts = select.querySelectorAll('option');
+            let anyVisible = false;
+            opts.forEach(opt => {
+                if (!opt.value) return;
+                const donemMatch = !donemId || opt.dataset.donem === donemId;
+                const turMatch = !tur || opt.dataset.tur === tur;
+                const show = donemMatch && turMatch;
+                opt.style.display = show ? '' : 'none';
+                if (show) anyVisible = true;
+            });
+            // Seçili değer gizlendiyse sıfırla
+            const selOpt = select.options[select.selectedIndex];
+            if (selOpt && selOpt.style.display === 'none') select.value = '';
+            // Placeholder güncelle
+            const placeholder = select.options[0];
+            if (placeholder) placeholder.textContent = anyVisible ? '— Bölüm Seçin —' : '— Bu dönem/tür için bölüm yok —';
+        }
+
+        // Sayfa yüklenince aktif döneme + türe göre filtrele
+        window.addEventListener('DOMContentLoaded', filterBolumler);
+
+        function toggleRegPw() {
+            const i = document.getElementById('reg-pw');
+            const e = document.getElementById('reg-pw-eye');
+            if (i.type === 'password') { i.type = 'text'; e.className = 'fa-solid fa-eye-slash text-sm'; }
+            else { i.type = 'password'; e.className = 'fa-solid fa-eye text-sm'; }
+        }
+
+        function previewPhoto(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = document.getElementById('photo-preview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    document.getElementById('foto-placeholder').style.display = 'none';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Öğretim türü radyo butonları
+        document.querySelectorAll('input[name="ogretim_turu"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.getElementById('tur-orgün-label').className = this.value === 'Örgün'
+                    ? 'tur-active border-2 rounded-xl p-3 text-center font-black text-sm cursor-pointer transition'
+                    : 'tur-inactive border-2 rounded-xl p-3 text-center font-black text-sm cursor-pointer transition';
+                document.getElementById('tur-gece-label').className = this.value === 'Gece'
+                    ? 'tur-active border-2 rounded-xl p-3 text-center font-black text-sm cursor-pointer transition'
+                    : 'tur-inactive border-2 rounded-xl p-3 text-center font-black text-sm cursor-pointer transition';
+                filterBolumler();
+            });
+        });
+    </script>
+    </div>
+</body>
+</html>

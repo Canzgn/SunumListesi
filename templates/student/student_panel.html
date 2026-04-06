@@ -1,0 +1,348 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-4">
+
+    {# ===== KİŞİSEL DURUM BANNER'I ===== #}
+    <div class="{% if my_assignment %}bg-emerald-50 border-emerald-400{% else %}bg-amber-50 border-amber-400{% endif %} border-l-4 rounded-2xl p-4 flex flex-wrap items-center gap-4 shadow-sm">
+        <div class="flex-1 min-w-0">
+            {% if my_assignment %}
+                <p class="text-[10px] font-black text-emerald-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-circle-check mr-1"></i>Sunum Atamanız Onaylandı</p>
+                <p class="font-black text-gray-800 text-sm truncate">{{ my_assignment.KonuAdi }}</p>
+                <p class="text-xs text-emerald-600 font-bold">{{ my_assignment.HaftaNo }}. Hafta</p>
+            {% else %}
+                <p class="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-hourglass-half mr-1"></i>Henüz Sunum Ataması Yapılmadı</p>
+                <p class="text-xs text-gray-500 font-bold">Konu başvurusu yaptıysanız atama sonucunu buradan görebilirsiniz.</p>
+            {% endif %}
+        </div>
+        <div class="flex gap-3 items-center">
+            <div class="text-center">
+                <p class="text-xl font-black {% if my_basvuru_count > 0 %}text-blue-600{% else %}text-gray-400{% endif %}">{{ my_basvuru_count }}</p>
+                <p class="text-[9px] font-black text-gray-400 uppercase">Konu Başvurusu</p>
+            </div>
+            <div class="w-px bg-gray-200 h-8"></div>
+            <div class="text-center">
+                {# 3 soru hakkı ilerlemesi #}
+                <div class="flex items-center gap-1 justify-center mb-0.5">
+                    {% for i in range(3) %}
+                        <div class="w-4 h-4 rounded-full {% if i < my_soru_count %}bg-purple-500{% else %}bg-gray-200{% endif %} transition"></div>
+                    {% endfor %}
+                </div>
+                <p class="text-xl font-black {% if my_soru_count > 0 %}text-purple-600{% else %}text-gray-400{% endif %}">{{ my_soru_count }}/3</p>
+                <p class="text-[9px] font-black text-gray-400 uppercase">Soru Hakkı</p>
+            </div>
+        </div>
+    </div>
+
+    {# ===== BAŞLIK + FİLTRE + ARAMA ===== #}
+    <div class="bg-white p-5 rounded-2xl shadow-lg border-b-4 border-emerald-600">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Sunum Görüntüleme Paneli</h1>
+                <p class="text-xs text-gray-400 font-bold mt-0.5">Başvurmak istediğiniz konu kartına tıklayın, <span class="text-emerald-600">Başvur</span> butonunu kullanın.</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                {# Arama kutusu #}
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" id="topic-search" placeholder="Konu ara..."
+                        oninput="filterTopics(this.value)"
+                        class="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-xs outline-none focus:border-emerald-400 w-44">
+                </div>
+                {# Öğretim türü seçimi #}
+                <form action="/student/panel" method="GET"
+                    class="flex items-center bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+                    <select name="tur" onchange="this.form.submit()"
+                        class="bg-transparent font-bold text-emerald-900 outline-none text-xs p-1">
+                        <option value="Örgün" {% if selected_tur=='Örgün' %}selected{% endif %}>Örgün</option>
+                        <option value="Gece" {% if selected_tur=='Gece' %}selected{% endif %}>Gece</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# ===== SUNUM SLOTLARI ===== #}
+    {% set ns = namespace(last_week=0) %}
+    {% for sunum in schedule_data %}
+    {% if sunum.HaftaNo != ns.last_week %}
+    <div class="bg-slate-800 text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic week-header flex items-center gap-3">
+        {{ sunum.HaftaNo }}. HAFTA
+        {% if sunum.SunumTarihi %}
+        <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
+        {% endif %}
+    </div>
+    {% set ns.last_week = sunum.HaftaNo %}
+    {% endif %}
+
+    {% set is_my_app = sunum.SunumID in my_applied_ids %}
+    {% set is_my_q = sunum.SunumID in my_question_ids %}
+    {% set is_my_slot = my_assignment and my_assignment.SunumID == sunum.SunumID %}
+
+    <div id="sunum-{{ sunum.SunumID }}"
+         data-konu="{{ sunum.KonuAdi|lower }}"
+         class="topic-card bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 transition
+                {% if is_my_slot %}border-blue-500
+                {% elif sunum.Onaylanan %}border-emerald-400
+                {% elif is_my_app %}border-indigo-300
+                {% else %}border-gray-200{% endif %}">
+
+        <div class="p-4 flex items-start gap-4">
+
+            {# Sol: Konu adı + durum badge'leri #}
+            <div class="w-[210px] flex-shrink-0 cursor-pointer group"
+                onclick="toggleDetails('detay-{{ sunum.SunumID }}')">
+
+                <div class="flex flex-wrap gap-1 mb-1.5">
+                    {% if is_my_slot %}
+                    <span class="text-[8px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded uppercase tracking-wider"><i class="fa-solid fa-star mr-0.5"></i>Benim Konularım</span>
+                    {% elif sunum.Onaylanan %}
+                    <span class="text-[8px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-wider"><i class="fa-solid fa-check mr-0.5"></i>Onaylandı</span>
+                    {% else %}
+                    <span class="text-[8px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded uppercase tracking-wider">Bekliyor</span>
+                    {% endif %}
+                    {% if is_my_app %}
+                    <span class="text-[8px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded uppercase tracking-wider"><i class="fa-solid fa-bookmark mr-0.5"></i>Başvurdum</span>
+                    {% endif %}
+                    {% if is_my_q %}
+                    <span class="text-[8px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded uppercase tracking-wider"><i class="fa-solid fa-question mr-0.5"></i>Soru Hakkım</span>
+                    {% endif %}
+                </div>
+
+                <a href="/student/topic/{{ sunum.SunumID }}"
+                   onclick="event.stopPropagation()"
+                   class="font-extrabold text-gray-800 text-sm group-hover:text-emerald-600 transition leading-tight block hover:underline">
+                    {{ sunum.KonuAdi }}
+                </a>
+                <p class="text-[10px] text-gray-400 font-bold mt-0.5">{{ sunum.HaftaNo }}. Hafta</p>
+            </div>
+
+            {# Orta: Atama durumu #}
+            <div class="flex-1 min-w-0">
+                {% if sunum.Onaylanan %}
+                <div class="flex items-center gap-2">
+                    <select disabled
+                        class="flex-1 min-w-0 p-2 border-2 border-gray-200 rounded-xl text-xs font-bold bg-gray-50 text-gray-700 outline-none cursor-default">
+                        {% for b in sunum.Basvurular %}
+                        <option value="{{ b.BasvuruID }}" {% if b.IsApproved %}selected{% endif %}>
+                            {% if b.IsApproved %}✓ {% endif %}{{ b.OncelikSirasi }}. / {{ b.Ogr1Label }}{% if b.Ogr2Label %} &amp; {{ b.Ogr2Label }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                    {% for a in sunum.Atananlar %}
+                    <a href="/student/profile/{{ a.OgrenciNo }}"
+                        class="text-[10px] font-bold text-emerald-700 hover:bg-emerald-600 hover:text-white transition bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                        {{ a.OgrenciNo }}{% if a.AdSoyad and a.AdSoyad != 'None' %} ({{ a.AdSoyad }}){% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-xs text-gray-400 italic font-bold py-2">Henüz atama yapılmadı</p>
+                <p class="text-[10px] text-gray-300 font-bold">{{ sunum.Basvurular|length }} başvuru var</p>
+                {% endif %}
+            </div>
+
+            {# Sağ: Aksiyon butonları #}
+            <div class="flex-shrink-0 flex flex-col gap-1.5">
+                {# Konu başvurusu butonu #}
+                {% if not is_my_app and not sunum.Onaylanan and not is_my_slot %}
+                <button onclick="openApplyModal({{ sunum.SunumID }}, '{{ sunum.KonuAdi|replace("'","\\'")|replace('"','\\"') }}', {{ sunum.HaftaNo }}, {{ sunum.Basvurular|length + 1 }})"
+                    class="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                    <i class="fa-solid fa-plus mr-1"></i>Başvur
+                </button>
+                {% elif is_my_app %}
+                <span class="bg-indigo-100 text-indigo-700 text-[10px] font-black px-3 py-1.5 rounded-lg whitespace-nowrap">
+                    <i class="fa-solid fa-bookmark mr-1"></i>Başvuruldu
+                </span>
+                {% endif %}
+                {# Soru başvurusu butonu #}
+                {% if not is_my_q and not is_my_slot and my_soru_count < 3 %}
+                <a href="/student/topic/{{ sunum.SunumID }}"
+                    class="bg-purple-100 hover:bg-purple-200 text-purple-700 text-[10px] font-black px-3 py-1.5 rounded-lg transition whitespace-nowrap text-center">
+                    <i class="fa-solid fa-question mr-1"></i>Soru Sor
+                </a>
+                {% elif is_my_q %}
+                <span class="bg-purple-50 text-purple-500 text-[10px] font-black px-3 py-1.5 rounded-lg whitespace-nowrap">
+                    <i class="fa-solid fa-check mr-1"></i>Soru Hakkı
+                </span>
+                {% endif %}
+                {# Kaç soru sorulmuş #}
+                <span class="text-[9px] font-black text-gray-400 text-center">
+                    <i class="fa-solid fa-comment text-gray-300 mr-0.5"></i>{{ sunum.SoruSayisi }} soru
+                </span>
+            </div>
+        </div>
+
+        {# Başvuru detayları (expandable) #}
+        <div id="detay-{{ sunum.SunumID }}" class="hidden border-t border-gray-100 bg-slate-50 p-5">
+            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tüm Başvurular</p>
+            <div class="space-y-2">
+                {% for b in sunum.Basvurular %}
+                <div class="flex items-center justify-between p-3 rounded-xl border text-sm
+                            {% if b.IsApproved %}bg-emerald-50 border-emerald-200
+                            {% elif b.Ogrenci1No == session.student_no or b.Ogrenci2No == session.student_no %}bg-indigo-50 border-indigo-200
+                            {% else %}bg-white border-slate-200{% endif %}">
+                    <span class="font-bold {% if b.IsApproved %}text-emerald-800{% else %}text-slate-700{% endif %}">
+                        {% if b.IsApproved %}<i class="fa-solid fa-check text-emerald-500 mr-1"></i>{% endif %}
+                        {% if b.Ogrenci1No == session.student_no or b.Ogrenci2No == session.student_no %}<i class="fa-solid fa-user text-indigo-500 mr-1"></i>{% endif %}
+                        {{ b.OncelikSirasi }}. — {{ b.Ogr1Label }}{% if b.Ogr2Label %} / {{ b.Ogr2Label }}{% endif %}
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-400 italic">
+                        {{ b.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if b.ZamanDamgasi else '--' }}
+                    </span>
+                </div>
+                {% endfor %}
+                {% if not sunum.Basvurular %}
+                <p class="text-center text-gray-400 italic text-xs py-4">Henüz başvuru yok — İlk siz olun!</p>
+                {% endif %}
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                <a href="/student/topic/{{ sunum.SunumID }}" class="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-4 py-2 rounded-xl font-black text-xs transition">
+                    <i class="fa-solid fa-users-viewfinder"></i> Detayları gör
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{# ===== KONU BAŞVURU MODALI ===== #}
+<div id="apply-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeApplyModal()"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
+        <button onclick="closeApplyModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition text-xl">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="mb-6">
+            <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-3">
+                <i class="fa-solid fa-bookmark text-emerald-600 text-xl"></i>
+            </div>
+            <h2 class="text-xl font-black text-gray-800 tracking-tighter">Konu Başvurusu</h2>
+            <p id="modal-konu" class="text-sm text-emerald-700 font-bold mt-1 leading-tight"></p>
+            <div class="flex items-center gap-2 mt-2">
+                <span id="modal-hafta" class="text-[10px] font-black text-gray-400 bg-gray-100 px-2 py-1 rounded"></span>
+                <span id="modal-sira" class="text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-1 rounded"></span>
+            </div>
+        </div>
+
+        <form action="/student/apply_topic" method="POST" class="space-y-4">
+            <input type="hidden" name="sunum_id" id="modal-sunum-id">
+
+            <div>
+                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">
+                    Ortak Öğrenci No <span class="text-gray-300 font-normal">(İsteğe bağlı)</span>
+                </label>
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-user-plus absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" name="ortak_no" id="ortak-no-input"
+                            placeholder="2021010002"
+                            oninput="lookupOrtak(this.value)"
+                            class="w-full pl-9 pr-3 py-2.5 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 bg-gray-50 focus:bg-white transition">
+                    </div>
+                    <button type="button" onclick="clearOrtak()" class="text-gray-400 hover:text-gray-600 px-2 transition">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+                <p id="ortak-name" class="mt-1 text-xs font-bold hidden"></p>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p class="text-xs text-amber-700 font-bold">
+                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    Başvurunuz listeye eklenir. Sıra belirlenir ve admin onayı ile atama yapılır.
+                </p>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-black text-sm transition shadow-lg shadow-emerald-200">
+                <i class="fa-solid fa-check mr-2"></i>Başvuruyu Gönder
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleDetails(id) {
+        document.getElementById(id).classList.toggle('hidden');
+    }
+
+    function filterTopics(q) {
+        q = q.toLowerCase().trim();
+        document.querySelectorAll('.topic-card').forEach(card => {
+            const konu = card.dataset.konu || '';
+            card.style.display = (!q || konu.includes(q)) ? '' : 'none';
+        });
+        document.querySelectorAll('.week-header').forEach(h => {
+            // Hafta başlığını gizle/göster — haftadaki herhangi bir kart görünüyorsa göster
+            let next = h.nextElementSibling;
+            let hasVisible = false;
+            while (next && !next.classList.contains('week-header')) {
+                if (next.classList.contains('topic-card') && next.style.display !== 'none') hasVisible = true;
+                next = next.nextElementSibling;
+            }
+            h.style.display = hasVisible ? '' : 'none';
+        });
+    }
+
+    function openApplyModal(sunumId, konuAdi, haftaNo, nextPos) {
+        document.getElementById('modal-sunum-id').value = sunumId;
+        document.getElementById('modal-konu').textContent = konuAdi;
+        document.getElementById('modal-hafta').textContent = haftaNo + '. Hafta';
+        document.getElementById('modal-sira').textContent = 'Tahmini Sıranız: ' + nextPos + '. sıra';
+        document.getElementById('ortak-no-input').value = '';
+        document.getElementById('ortak-name').classList.add('hidden');
+        document.getElementById('apply-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeApplyModal() {
+        document.getElementById('apply-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    let ortakTimeout;
+    function lookupOrtak(val) {
+        clearTimeout(ortakTimeout);
+        const nameEl = document.getElementById('ortak-name');
+        if (val.length < 7) { nameEl.classList.add('hidden'); return; }
+        ortakTimeout = setTimeout(() => {
+            fetch('/api/student_lookup?no=' + encodeURIComponent(val))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.found) {
+                        nameEl.textContent = '✓ ' + (data.ad_soyad || val);
+                        nameEl.className = 'mt-1 text-xs font-bold text-emerald-600';
+                    } else {
+                        nameEl.textContent = '✗ Öğrenci bulunamadı';
+                        nameEl.className = 'mt-1 text-xs font-bold text-red-500';
+                    }
+                    nameEl.classList.remove('hidden');
+                });
+        }, 400);
+    }
+
+    function clearOrtak() {
+        document.getElementById('ortak-no-input').value = '';
+        document.getElementById('ortak-name').classList.add('hidden');
+    }
+
+    window.addEventListener('load', function () {
+        if (window.location.hash) {
+            const el = document.querySelector(window.location.hash);
+            if (el) {
+                setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-2', 'ring-emerald-400', 'ring-offset-2');
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-400', 'ring-offset-2'), 2500);
+                }, 100);
+            }
+        }
+    });
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeApplyModal(); });
+</script>
+{% endblock %}

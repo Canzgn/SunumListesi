@@ -1,0 +1,293 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    {# BASLIK #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-orange-500">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Soru Onay Paneli</h1>
+                <p class="text-xs text-gray-500 font-medium mt-1">
+                    Soru başvurularını konu konu inceleyip onaylayabilir veya reddedebilirsiniz.
+                </p>
+            </div>
+            <form action="{{ url_for('kontrolcu.kontrolcu_panel') }}" method="GET"
+                  class="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-xl border border-orange-200">
+                <label class="text-[10px] font-black text-orange-700 uppercase tracking-widest">Hafta</label>
+                <select name="hafta" onchange="this.form.submit()"
+                        class="bg-transparent font-bold text-orange-900 outline-none text-xs p-1">
+                    <option value="">Tümü</option>
+                    {% for h in haftalar %}
+                    <option value="{{ h }}" {% if secili_hafta|string == h|string %}selected{% endif %}>
+                        Hafta {{ h }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+    </div>
+
+    {# ISTATISTIK #}
+    {% set total = sorular|length %}
+    {% set onaylanan = sorular | selectattr('IsApproved') | list | length %}
+    {% set bekleyen = total - onaylanan %}
+    <div class="grid grid-cols-3 gap-3">
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-blue-500 flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-list text-blue-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Toplam</p>
+                <p class="text-2xl font-black text-gray-800">{{ total }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-emerald-500 flex items-center gap-3">
+            <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-check text-emerald-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Onaylanan</p>
+                <p class="text-2xl font-black text-emerald-600">{{ onaylanan }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-orange-400 flex items-center gap-3">
+            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-hourglass-half text-orange-500 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Bekleyen</p>
+                <p class="text-2xl font-black text-orange-500">{{ bekleyen }}</p>
+            </div>
+        </div>
+    </div>
+
+    {# TOPLU ISLEM BARI #}
+    <div id="toplu-bar" class="hidden items-center gap-2 px-4 py-3 bg-orange-50 rounded-2xl border border-orange-200 flex-wrap shadow-sm">
+        <span id="secim-sayisi" class="text-xs font-black text-orange-700 min-w-max">0 seçili</span>
+        <form id="toplu-form" action="{{ url_for('kontrolcu.kontrolcu_soru_toplu_guncelle') }}" method="POST" class="contents">
+            <input type="hidden" name="hafta" value="{{ secili_hafta }}">
+            <input type="hidden" name="action" id="toplu-action" value="">
+            <div id="toplu-ids-container"></div>
+            <button type="button" onclick="topluIslem('approve')"
+                    class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-check mr-1"></i>Toplu Onayla
+            </button>
+            <button type="button" onclick="toggleTopluRedBox()"
+                    class="bg-red-500 hover:bg-red-600 text-white text-xs font-black px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-xmark mr-1"></i>Toplu Reddet
+            </button>
+        </form>
+        <button type="button" onclick="secimTemizle()"
+                class="ml-auto text-orange-400 hover:text-orange-600 text-xs font-bold">
+            Seçimi Temizle
+        </button>
+    </div>
+    <div id="toplu-red-box" class="hidden px-4 py-3 bg-red-50 rounded-2xl border border-red-200 flex items-center gap-2 flex-wrap shadow-sm">
+        <input type="text" id="toplu-red-reason" value="Derse katılmadı veya soru sormadı."
+               class="flex-1 min-w-0 border border-red-300 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:border-red-500">
+        <button type="button" onclick="topluIslem('reject')"
+                class="bg-red-600 hover:bg-red-700 text-white text-xs font-black px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+            Reddetmeyi Onayla
+        </button>
+        <button type="button" onclick="document.getElementById('toplu-red-box').classList.add('hidden')"
+                class="text-red-400 hover:text-red-600 text-xs font-bold">İptal</button>
+    </div>
+
+    {# KONULARA GORE LISTELEME #}
+    {% if konular|list|length > 0 %}
+        {% for konu in konular %}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition"
+                 onclick="toggleKonu('konu-{{ loop.index }}')">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+                                {% if konu.editable %}bg-orange-100 text-orange-700{% else %}bg-gray-100 text-gray-400{% endif %}">
+                        <i class="fa-solid fa-book text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-gray-800 text-sm">{{ konu.konu }}</h3>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-[10px] font-bold text-gray-400">Hafta {{ konu.hafta }}</span>
+                            <span class="text-[10px] font-bold text-gray-400">&middot;</span>
+                            <span class="text-[10px] font-bold text-gray-400">{{ konu.ogretim_turu }}</span>
+                            {% if konu.sunum_tarihi %}
+                            <span class="text-[10px] font-bold text-gray-400">&middot;</span>
+                            <span class="text-[10px] font-bold text-blue-500">{{ konu.sunum_tarihi.strftime('%d.%m.%Y') }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% set onayli = konu.basvurular|selectattr('IsApproved')|list|length %}
+                    {% set toplam = konu.basvurular|length %}
+                    <span class="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-lg">{{ onayli }}/{{ toplam }}</span>
+                    {% if not konu.editable %}
+                    <span class="bg-red-100 text-red-600 text-[9px] font-black px-2 py-0.5 rounded-lg">
+                        <i class="fa-solid fa-lock mr-0.5"></i>Kilitli
+                    </span>
+                    {% endif %}
+                    <i class="fa-solid fa-chevron-down text-gray-400 text-xs transition konu-chevron" id="chevron-{{ loop.index }}"></i>
+                </div>
+            </div>
+
+            {% if not konu.editable %}
+            <div class="px-4 py-2 bg-red-50 border-b border-red-100 text-[11px] font-bold text-red-600">
+                <i class="fa-solid fa-clock mr-1"></i>{{ konu.zaman_mesaj }}
+            </div>
+            {% endif %}
+
+            <div id="konu-{{ loop.index }}" class="divide-y divide-gray-50">
+                {% for s in konu.basvurular %}
+                <div class="p-3 flex items-center gap-3 hover:bg-gray-50 transition {% if s.IsApproved %}bg-emerald-50/30{% endif %}">
+                    {% if konu.editable %}
+                    <input type="checkbox" name="row-check" value="{{ s.SoruBasvuruID }}"
+                           onchange="guncelleSecim()"
+                           class="rounded accent-orange-500 w-4 h-4 flex-shrink-0">
+                    {% else %}
+                    <div class="w-4 flex-shrink-0"></div>
+                    {% endif %}
+
+                    <div class="w-24 flex-shrink-0">
+                        {% if s.IsApproved %}
+                            <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-black uppercase">
+                                <i class="fa-solid fa-check"></i> Onaylı
+                            </span>
+                        {% elif s.IsApproved is false and s.RejectReason %}
+                            <span class="inline-flex items-center gap-1 bg-red-100 text-red-600 px-2 py-1 rounded-lg text-[10px] font-black uppercase">
+                                <i class="fa-solid fa-xmark"></i> Red
+                            </span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-black uppercase">
+                                <i class="fa-solid fa-clock"></i> Bekliyor
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-sm text-gray-800 truncate">{{ s.AdSoyad or s.OgrenciNo }}</p>
+                        <p class="font-mono text-[10px] text-blue-500 italic">{{ s.OgrenciNo }}</p>
+                    </div>
+
+                    <div class="text-[11px] text-gray-400 font-bold whitespace-nowrap hidden md:block">
+                        {{ s.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if s.ZamanDamgasi else '&mdash;' }}
+                    </div>
+
+                    {% if konu.editable %}
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <form action="{{ url_for('kontrolcu.kontrolcu_soru_guncelle') }}" method="POST">
+                            <input type="hidden" name="basvuru_id" value="{{ s.SoruBasvuruID }}">
+                            <input type="hidden" name="action" value="approve">
+                            <input type="hidden" name="hafta" value="{{ secili_hafta }}">
+                            <button type="submit" title="Onayla"
+                                    class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
+                        </form>
+                        <button type="button" onclick="toggleReject({{ s.SoruBasvuruID }})" title="Reddet"
+                                class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="w-16 flex-shrink-0"></div>
+                    {% endif %}
+                </div>
+
+                {% if konu.editable %}
+                <div id="reject-{{ s.SoruBasvuruID }}" class="hidden px-4 py-2 bg-red-50/50">
+                    <form action="{{ url_for('kontrolcu.kontrolcu_soru_guncelle') }}" method="POST" class="flex items-center gap-2">
+                        <input type="hidden" name="basvuru_id" value="{{ s.SoruBasvuruID }}">
+                        <input type="hidden" name="action" value="reject">
+                        <input type="hidden" name="hafta" value="{{ secili_hafta }}">
+                        <textarea name="reject_reason" rows="1" placeholder="Red gerekçesi..."
+                                  class="flex-1 border border-red-200 rounded-lg px-2 py-1 text-[11px] font-bold resize-none outline-none focus:border-red-400">Derse katılmadı veya soru sormadı.</textarea>
+                        <button type="submit"
+                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg font-black text-[11px] transition whitespace-nowrap">
+                            Reddet
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
+        <i class="fa-solid fa-inbox text-gray-300 text-5xl mb-4"></i>
+        <p class="font-black text-gray-400 text-lg">Başvuru bulunamadı</p>
+        <p class="text-gray-400 text-sm mt-1">
+            {% if secili_hafta %}
+                Hafta {{ secili_hafta }} için kayıt yok.
+            {% else %}
+                Bu bölüme ait soru başvurusu bulunmuyor.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function toggleKonu(id) {
+    var el = document.getElementById(id);
+    var idx = id.split('-')[1];
+    var chevron = document.getElementById('chevron-' + idx);
+    el.classList.toggle('hidden');
+    if (chevron) chevron.classList.toggle('rotate-180');
+}
+
+function toggleReject(id) {
+    var el = document.getElementById('reject-' + id);
+    if (el) el.classList.toggle('hidden');
+}
+
+function guncelleSecim() {
+    var checked = document.querySelectorAll('input[name="row-check"]:checked');
+    var bar = document.getElementById('toplu-bar');
+    var sayac = document.getElementById('secim-sayisi');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        bar.classList.add('flex');
+        sayac.textContent = checked.length + ' seçili';
+    } else {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+        document.getElementById('toplu-red-box').classList.add('hidden');
+    }
+}
+
+function secimTemizle() {
+    document.querySelectorAll('input[name="row-check"]').forEach(function(c) { c.checked = false; });
+    guncelleSecim();
+}
+
+function toggleTopluRedBox() {
+    document.getElementById('toplu-red-box').classList.toggle('hidden');
+}
+
+function topluIslem(action) {
+    var checked = document.querySelectorAll('input[name="row-check"]:checked');
+    if (checked.length === 0) { alert('Lütfen en az bir kayıt seçin.'); return; }
+    var form = document.getElementById('toplu-form');
+    document.getElementById('toplu-action').value = action;
+    var oldReason = form.querySelector('input[name="reject_reason"]');
+    if (oldReason) oldReason.remove();
+    if (action === 'reject') {
+        var reason = document.getElementById('toplu-red-reason').value || 'Toplu red işlemi.';
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'reject_reason'; inp.value = reason;
+        form.appendChild(inp);
+    }
+    var container = document.getElementById('toplu-ids-container');
+    container.innerHTML = '';
+    checked.forEach(function(c) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        container.appendChild(inp);
+    });
+    form.submit();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,345 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-4">
+    {# ===== İSTATİSTİK KARTLARI ===== #}
+    {% set total = schedule_data | length %}
+    {% set onaylanan = schedule_data | selectattr('Onaylanan') | list | length %}
+    {% set bekleyen = total - onaylanan %}
+    {% set basvuru_olan = schedule_data | selectattr('Basvurular') | list | length %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-blue-500 flex items-center gap-4">
+            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-calendar-days text-blue-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Toplam Slot</p>
+                <p class="text-2xl font-black text-gray-800">{{ total }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-emerald-500 flex items-center gap-4">
+            <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Onaylanan</p>
+                <p class="text-2xl font-black text-emerald-600">{{ onaylanan }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-orange-400 flex items-center gap-4">
+            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-hourglass-half text-orange-500 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Bekleyen</p>
+                <p class="text-2xl font-black text-orange-500">{{ bekleyen }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-purple-500 flex items-center gap-4">
+            <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-file-pen text-purple-500 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Başvurulu</p>
+                <p class="text-2xl font-black text-purple-600">{{ basvuru_olan }}</p>
+            </div>
+        </div>
+    </div>
+    {# ===== BAŞLIK + FİLTRE + TOPLU İŞLEM BUTONLARI ===== #}
+    <div class="bg-white p-5 rounded-2xl shadow-lg border-b-4 border-blue-600">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Sunum Yönetim Paneli</h1>
+
+            {# Öğretim türü seçimi #}
+            <form action="/admin/panel" method="GET"
+                class="flex items-center bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100">
+                <select name="tur" onchange="this.form.submit()"
+                    class="bg-transparent font-bold text-blue-900 outline-none text-xs p-1">
+                    {% if allowed_turs %}
+                        {% for tur in allowed_turs %}
+                        <option value="{{ tur }}" {% if selected_tur == tur %}selected{% endif %}>{{ tur }}</option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="Örgün" {% if selected_tur=='Örgün' %}selected{% endif %}>Örgün</option>
+                        <option value="Gece" {% if selected_tur=='Gece' %}selected{% endif %}>Gece</option>
+                    {% endif %}
+                </select>
+            </form>
+        </div>
+
+        {# Toplu işlem butonları #}
+        <div class="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100">
+            <form action="/admin/auto_assign" method="POST">
+                <input type="hidden" name="tur" value="{{ selected_tur }}">
+                <button type="submit"
+                    onclick="return confirm('Onaylanmamış tüm konular otomatik olarak en yüksek tercih sırasına göre atanacak. Devam edilsin mi?')"
+                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Hepsini Otomatik Onayla
+                </button>
+            </form>
+            <form action="/admin/clear_all" method="POST">
+                <input type="hidden" name="tur" value="{{ selected_tur }}">
+                <button type="submit"
+                    onclick="return confirm('{{ selected_tur }} türündeki TÜM onaylar kaldırılacak. Bu işlem geri alınamaz. Emin misiniz?')"
+                    class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-trash-can"></i> Tüm Onayları Kaldır
+                </button>
+            </form>
+            <a href="/admin/export/excel?tur={{ selected_tur }}"
+                class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                <i class="fa-solid fa-file-excel"></i> Excel İndir
+            </a>
+            <a href="/admin/export/pdf?tur={{ selected_tur }}"
+                class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                <i class="fa-solid fa-file-pdf"></i> PDF İndir
+            </a>
+            <!-- Başvuru Süresi Kilidi -->
+            <button onclick="toggleKilidiPanel()" class="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                <i class="fa-solid fa-clock"></i> Başvuru Kilidi
+            </button>
+        </div>
+
+        <!-- Başvuru Kilidi Paneli (gizli) -->
+        <div id="kilidi-panel" class="hidden mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+            <p class="text-xs font-bold text-orange-800 mb-2">
+                <i class="fa-solid fa-circle-info mr-1"></i> Belirli bir dönem için öğrenci başvurularını tarihle kilitleyebilirsiniz.
+                Bitiş tarihi geçmişse öğrenciler başvuru yapamaz. Boş bırakırsanız kilit kaldırılır.
+            </p>
+            <form action="/admin/donem_kilidi" method="POST" class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">Dönem</label>
+                    <select name="donem_id" class="border border-gray-300 rounded-lg text-xs p-2 font-bold outline-none">
+                        {% for d in donemler %}
+                        <option value="{{ d.DonemID }}">{{ d.YilLabel }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">Başvuru Bitiş Tarihi/Saati</label>
+                    <input type="datetime-local" name="bitis_tarihi"
+                        class="border border-gray-300 rounded-lg text-xs p-2 font-bold outline-none">
+                </div>
+                <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-lock mr-1"></i> Kaydet
+                </button>
+            </form>
+        </div>
+        <script>
+            function toggleKilidiPanel() {
+                document.getElementById('kilidi-panel').classList.toggle('hidden');
+            }
+        </script>
+    </div>
+
+    {# ===== SUNUM SLOTLARI ===== #}
+    {% set ns = namespace(last_week=0) %}
+    {% for sunum in schedule_data %}
+    {% if sunum.HaftaNo != ns.last_week %}
+    <div id="hafta-{{ sunum.HaftaNo }}" class="bg-slate-800 text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3">
+        {{ sunum.HaftaNo }}. HAFTA
+        {% if sunum.SunumTarihi %}
+        <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
+        {% endif %}
+        <form action="/admin/update_hafta_tarihi" method="POST" class="ml-auto flex items-center gap-2 normal-case not-italic tracking-normal">
+            <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
+            <input type="hidden" name="tur" value="{{ selected_tur }}">
+            <input type="date" name="yeni_tarih" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}"
+                class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 outline-none cursor-pointer hover:border-blue-400 transition"
+                onchange="this.form.submit()" title="Hafta tarihini değiştir">
+        </form>
+    </div>
+    {% set ns.last_week = sunum.HaftaNo %}
+    {% endif %}
+
+    {# Kart rengi: onaylı → yeşil kenarlık, onaysız → gri #}
+    <div id="sunum-{{ sunum.SunumID }}" class="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 transition
+                    {% if sunum.Onaylanan %}border-emerald-400{% else %}border-gray-200{% endif %}">
+
+        <div class="p-4 flex items-center gap-4">
+
+            {# Konu adı — tıklayınca başvuru detayları açılır #}
+            <div class="w-[220px] flex-shrink-0 cursor-pointer group"
+                onclick="toggleDetails('detay-{{ sunum.SunumID }}')">
+                {% if sunum.Onaylanan %}
+                <span
+                    class="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded mb-1 inline-block uppercase tracking-wider">✓
+                    Onaylandı</span>
+                {% else %}
+                <span
+                    class="text-[8px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded mb-1 inline-block uppercase tracking-wider">Bekliyor</span>
+                {% endif %}
+                <h3 class="font-extrabold text-gray-800 text-sm group-hover:text-blue-600 transition leading-tight">{{
+                    sunum.KonuAdi }}</h3>
+            </div>
+
+            {# Dropdown — her zaman görünür, onaylanan ✓ ile en üstte #}
+            <div class="flex-1 min-w-0">
+                {% if sunum.Onaylanan %}
+                {# ONAYLANDI: Sadece dropdown (bilgi için) + Onayı Kaldır #}
+                <div class="flex items-center gap-2">
+                    <select disabled
+                        class="flex-1 min-w-0 p-2 border-2 border-gray-200 rounded-xl text-xs font-bold bg-gray-50 text-gray-700 outline-none cursor-default">
+                        {% for b in sunum.Basvurular %}
+                        <option value="{{ b.BasvuruID }}" {% if b.IsApproved %}selected{% endif %}>
+                            {% if b.IsApproved %}✓ {% endif %}{{ b.OncelikSirasi }}. Tercih: {{ b.Ogr1Label }}{% if
+                            b.Ogr2Label %} &amp; {{ b.Ogr2Label }}{% else %} (Bireysel){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <form action="/admin/clear_assignment" method="POST" class="flex-shrink-0">
+                        <input type="hidden" name="sunum_id" value="{{ sunum.SunumID }}">
+                        <input type="hidden" name="tur" value="{{ selected_tur }}">
+                        <button type="submit" onclick="return confirm('Bu konunun onayı kaldırılsın mı?')"
+                            class="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs transition whitespace-nowrap shadow-sm">
+                            <i class="fa-solid fa-rotate-left text-[10px]"></i> Onayı Kaldır
+                        </button>
+                    </form>
+                    <form action="/admin/move_konu" method="POST" class="flex items-center gap-1 ml-2" onsubmit="return confirm('Bu konu seçili haftaya taşınsın mı?')">
+                        <input type="hidden" name="sunum_id" value="{{ sunum.SunumID }}">
+                        <input type="hidden" name="tur" value="{{ selected_tur }}">
+                        <input type="number" name="yeni_hafta_no" min="1" max="15" step="1"
+                            placeholder="HEDEF HAFTA" aria-label="Hedef Hafta"
+                            class="text-xs p-1 border border-gray-200 rounded-lg font-bold outline-none focus:border-blue-400 w-20 placeholder-gray-400 text-center"
+                            required onkeydown="if(event.key==='Enter'){event.preventDefault();this.nextElementSibling.click();}">
+                        <button type="button" onclick="moveKonuSubmit(this)" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded-lg font-black text-xs transition flex items-center justify-center" title="Taşı">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                        </button>
+                    </form>
+                </div>
+
+                {# Atanan öğrenci bilgisi #}
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                    {% for a in sunum.Atananlar %}
+                    <span
+                        class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                        {{ a.OgrenciNo }}{% if a.AdSoyad and a.AdSoyad != 'None' %}({{ a.AdSoyad }}){% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+
+                {% else %}
+                {# ONAYSIZ: Aktif dropdown + Onayla butonu #}
+                <form action="/admin/assign" method="POST" class="flex items-center gap-2">
+                    <input type="hidden" name="sunum_id" value="{{ sunum.SunumID }}">
+                    <input type="hidden" name="tur" value="{{ selected_tur }}">
+                    <select name="basvuru_id"
+                        class="flex-1 min-w-0 p-2 border-2 border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none focus:border-blue-400 transition">
+                        {% for b in sunum.Basvurular %}
+                        <option value="{{ b.BasvuruID }}">
+                            {{ b.OncelikSirasi }}. Tercih: {{ b.Ogr1Label }}{% if b.Ogr2Label %} &amp; {{ b.Ogr2Label
+                            }}{% else %} (Bireysel){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit"
+                        class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-black text-xs transition whitespace-nowrap shadow-sm flex-shrink-0">
+                        <i class="fa-solid fa-check text-[10px]"></i> Onayla
+                    </button>
+                </form>
+                <div class="relative flex-shrink-0 mt-1">
+                    <button type="button" onclick="toggleMovePanel('move-{{ sunum.SunumID }}')"
+                        class="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl font-black text-xs transition whitespace-nowrap shadow-sm"
+                        title="Konuyu farklı haftaya taşı">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-[10px]"></i>
+                    </button>
+                    <div id="move-{{ sunum.SunumID }}" class="hidden absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-3 min-w-[180px]">
+                        <form action="/admin/move_konu" method="POST" class="flex flex-col gap-2">
+                            <input type="hidden" name="sunum_id" value="{{ sunum.SunumID }}">
+                            <input type="hidden" name="tur" value="{{ selected_tur }}">
+                            <label class="text-[10px] font-black text-gray-500 uppercase">Hedef Hafta</label>
+                            <select name="yeni_hafta_no" class="text-xs p-2 border border-gray-200 rounded-lg font-bold outline-none focus:border-blue-400">
+                                {% for w in hafta_listesi %}
+                                <option value="{{ w }}" {% if w == sunum.HaftaNo %}selected{% endif %}>{{ w }}. Hafta</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" onclick="return confirm('Bu konu seçili haftaya taşınsın mı?')"
+                                class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-black text-xs transition">
+                                <i class="fa-solid fa-check mr-1"></i> Taşı
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+
+        {# Başvuru detayları (İncele'ye tıklayınca açılır) #}
+        <div id="detay-{{ sunum.SunumID }}" class="hidden border-t border-gray-100 bg-slate-50 p-5">
+            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tüm Başvurular</p>
+            <div class="space-y-2">
+                {% for b in sunum.Basvurular %}
+                <div
+                    class="flex items-center justify-between p-3 rounded-xl border text-sm
+                                {% if b.IsApproved %}bg-emerald-50 border-emerald-200{% else %}bg-white border-slate-200{% endif %}">
+                    <span class="font-bold {% if b.IsApproved %}text-emerald-800{% else %}text-slate-700{% endif %}">
+                        {% if b.IsApproved %}<i class="fa-solid fa-check text-emerald-500 mr-1"></i>{% endif %}
+                        {{ b.OncelikSirasi }}-
+                        <a href="/admin/student/{{ b.Ogrenci1No }}" class="text-blue-600 hover:underline">{{ b.Ogr1Label
+                            }}</a>
+                        {% if b.Ogr2Label %} / <a href="/admin/student/{{ b.Ogrenci2No }}"
+                            class="text-blue-600 hover:underline">{{ b.Ogr2Label }}</a>{% endif %}
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-400 italic">
+                        {{ b.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if b.ZamanDamgasi else '--' }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                <a href="/admin/topic/{{ sunum.SunumID }}" class="inline-flex items-center gap-2 bg-blue-100 text-blue-800 hover:bg-blue-200 px-4 py-2 rounded-xl font-black text-xs transition">
+                    <i class="fa-solid fa-users-viewfinder"></i> Sorular ({{ sunum.SoruSayisi }}) ve soru soracak öğrencileri gör
+                </a>
+            </div>
+        </div>
+
+    </div>
+    {% endfor %}
+
+</div>
+<script>
+    function toggleDetails(id) {
+        document.getElementById(id).classList.toggle('hidden');
+    }
+    function toggleMovePanel(id) {
+        // Diğer açık move panellerini kapat
+        document.querySelectorAll('[id^="move-"]').forEach(function(el) {
+            if (el.id !== id) el.classList.add('hidden');
+        });
+        document.getElementById(id).classList.toggle('hidden');
+    }
+    // Dışarı tıklayınca move panellerini kapat
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('[id^="move-"]') && !e.target.closest('[onclick*="toggleMovePanel"]')) {
+            document.querySelectorAll('[id^="move-"]').forEach(function(el) {
+                el.classList.add('hidden');
+            });
+        }
+    });
+    function moveKonuSubmit(btn) {
+        const input = btn.parentElement.querySelector('input[name="yeni_hafta_no"]');
+        const val = parseInt(input.value, 10);
+        if (!val || val < 1 || val > 15) {
+            alert('Hedef hafta 1 ile 15 arasında olmalı!');
+            input.focus();
+            return false;
+        }
+        // Formu submit et
+        btn.closest('form').submit();
+    }
+    // Sayfa yüklenince URL'deki #sunum-XX veya #hafta-XX'e scroll yap ve vurgula
+    window.addEventListener('load', function () {
+        if (window.location.hash) {
+            const el = document.querySelector(window.location.hash);
+            if (el) {
+                setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2');
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2'), 2500);
+                }, 100);
+            }
+        }
+    });
+</script>
+{% endblock %}

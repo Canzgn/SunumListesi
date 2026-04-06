@@ -1,0 +1,180 @@
+﻿{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-cyan-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Hafta Yönetimi</h1>
+            <p class="text-xs text-gray-500 font-medium mt-1">Sunum programı slotlarını buradan ekleyebilir, hafta numarasını değiştirebilir veya silebilirsiniz.</p>
+        </div>
+    </div>
+
+    {# BÖLÜM SEÇİMİ #}
+    <form action="{{ url_for('hoca.hoca_hafta_yonetimi') }}" method="GET"
+          class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-3 flex-wrap">
+        <label class="text-xs font-black text-gray-600 uppercase tracking-widest whitespace-nowrap">Bölüm Seç:</label>
+        <select name="bolum_id" onchange="this.form.submit()"
+                class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-cyan-400 min-w-0">
+            <option value="">— Bölüm seçin —</option>
+            {% for b in bolumler %}
+            <option value="{{ b.BolumID }}" {% if secili_bolum_id|string == b.BolumID|string %}selected{% endif %}>
+                {{ b.BolumAdi }} ({{ b.OgretimTuru }}) – {{ b.DonemAdi }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if secili_bolum_id %}
+
+    {# YENİ SLOT EKLEME #}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <h3 class="font-black text-gray-700 text-sm mb-4 uppercase tracking-widest">
+            <i class="fa-solid fa-plus-circle text-cyan-500 mr-2"></i>Yeni Sunum Slotu Ekle
+        </h3>
+        <form action="{{ url_for('hoca.hoca_sunum_ekle') }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <select name="konu_id" required
+                    class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:border-cyan-400">
+                <option value="">— Konu seçin —</option>
+                {% for k in tum_konular %}
+                <option value="{{ k.KonuID }}">{{ k.KonuAdi }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="hafta_no" required min="1" max="52" placeholder="Hafta No"
+                   class="w-28 border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium text-center outline-none focus:border-cyan-400">
+            <button type="submit"
+                    class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-xl font-black text-sm transition whitespace-nowrap">
+                <i class="fa-solid fa-plus mr-1"></i>Ekle
+            </button>
+        </form>
+    </div>
+
+    {# SLOT LİSTESİ #}
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        {% if slotlar %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
+                        <th class="p-4 font-black w-10">#</th>
+                        <th class="p-4 font-black w-24">Hafta</th>
+                        <th class="p-4 font-black w-36">Sunum Tarihi</th>
+                        <th class="p-4 font-black">Konu</th>
+                        <th class="p-4 font-black w-24">Tür</th>
+                        <th class="p-4 font-black text-center">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for slot in slotlar %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="p-3 text-gray-400 font-bold text-sm text-center">{{ loop.index }}</td>
+                        <td class="p-3">
+                            <div id="hafta-label-{{ slot.SunumID }}" class="font-black text-2xl text-gray-600 text-center">
+                                {{ slot.HaftaNo }}
+                            </div>
+                            <form id="hafta-form-{{ slot.SunumID }}" class="hidden"
+                                  action="{{ url_for('hoca.hoca_sunum_hafta_guncelle') }}" method="POST">
+                                <input type="hidden" name="sunum_id" value="{{ slot.SunumID }}">
+                                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                                <div class="flex gap-1 items-center">
+                                    <input type="number" name="hafta_no" value="{{ slot.HaftaNo }}" min="1" max="52"
+                                           class="w-16 border border-cyan-300 rounded-lg px-2 py-1 text-sm font-bold text-center outline-none focus:border-cyan-500">
+                                    <button type="submit"
+                                            class="bg-cyan-600 text-white px-2 py-1 rounded-lg font-black text-[10px] transition hover:bg-cyan-700">OK</button>
+                                </div>
+                            </form>
+                        </td>
+                        <td class="p-3">
+                            <div id="tarih-label-{{ slot.SunumID }}" class="font-bold text-sm text-gray-700">
+                                {% if slot.SunumTarihi %}
+                                    {{ slot.SunumTarihi.strftime('%d.%m.%Y') }}
+                                    <span class="text-[10px] text-gray-400 block">{{ ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'][slot.SunumTarihi.weekday()] }}</span>
+                                {% else %}
+                                    <span class="text-gray-300">—</span>
+                                {% endif %}
+                            </div>
+                            <form id="tarih-form-{{ slot.SunumID }}" class="hidden"
+                                  action="{{ url_for('hoca.hoca_sunum_tarih_guncelle') }}" method="POST">
+                                <input type="hidden" name="sunum_id" value="{{ slot.SunumID }}">
+                                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                                <input type="hidden" name="hafta_no" value="{{ slot.HaftaNo }}">
+                                <div class="flex flex-col gap-1">
+                                    <input type="date" name="sunum_tarihi"
+                                           value="{{ slot.SunumTarihi.strftime('%Y-%m-%d') if slot.SunumTarihi else '' }}"
+                                           class="w-36 border border-cyan-300 rounded-lg px-2 py-1 text-sm font-bold outline-none focus:border-cyan-500">
+                                    <label class="flex items-center gap-1 text-[10px] text-gray-500 font-bold">
+                                        <input type="checkbox" name="shift_others" value="1" class="rounded">
+                                        Sonraki haftaları da kaydır
+                                    </label>
+                                    <button type="submit"
+                                            class="bg-cyan-600 text-white px-2 py-1 rounded-lg font-black text-[10px] transition hover:bg-cyan-700">Kaydet</button>
+                                </div>
+                            </form>
+                        </td>
+                        <td class="p-3 font-bold text-sm text-gray-800">{{ slot.KonuAdi }}</td>
+                        <td class="p-3">
+                            <span class="text-[11px] font-black px-2 py-0.5 rounded-full
+                                {% if slot.OgretimTuru == 'Örgün' %}bg-blue-100 text-blue-700{% else %}bg-violet-100 text-violet-700{% endif %}">
+                                {{ slot.OgretimTuru }}
+                            </span>
+                        </td>
+                        <td class="p-3 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <button type="button" onclick="toggleHaftaEdit({{ slot.SunumID }})"
+                                        class="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition"
+                                        title="Hafta değiştir">
+                                    <i class="fa-solid fa-calendar-pen"></i>
+                                </button>
+                                <button type="button" onclick="toggleTarihEdit({{ slot.SunumID }})"
+                                        class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition"
+                                        title="Tarih değiştir">
+                                    <i class="fa-solid fa-calendar-day"></i>
+                                </button>
+                                <form action="{{ url_for('hoca.hoca_sunum_sil', sunum_id=slot.SunumID) }}" method="POST"
+                                      onsubmit="return confirm('{{ slot.KonuAdi }} (Hafta {{ slot.HaftaNo }}) slotu silinsin mi?')">
+                                    <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                                    <button type="submit"
+                                            class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg font-black text-[11px] transition"
+                                            title="Slotu sil">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="px-4 py-2 text-[11px] text-gray-400 font-bold border-t border-gray-100">
+            Toplam {{ slotlar|length }} slot
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <i class="fa-solid fa-calendar-xmark text-gray-300 text-5xl mb-4"></i>
+            <p class="font-black text-gray-400 text-lg">Bu bölüme ait slot yok</p>
+            <p class="text-gray-400 text-sm mt-1">Yukarıdaki formdan ilk slotu ekleyin.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+        <i class="fa-solid fa-hand-pointer text-gray-300 text-5xl mb-4"></i>
+        <p class="font-black text-gray-400 text-lg">Yukarıdan bir bölüm seçin</p>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function toggleHaftaEdit(id) {
+    document.getElementById('hafta-label-' + id).classList.toggle('hidden');
+    document.getElementById('hafta-form-' + id).classList.toggle('hidden');
+}
+function toggleTarihEdit(id) {
+    document.getElementById('tarih-label-' + id).classList.toggle('hidden');
+    document.getElementById('tarih-form-' + id).classList.toggle('hidden');
+}
+</script>
+{% endblock %}

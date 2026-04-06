@@ -1,0 +1,129 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    {# BAŞLIK #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-blue-600">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <div class="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                    <a href="{{ url_for('hoca.hoca_panel') }}" class="hover:text-purple-600 transition">Panel</a>
+                    <i class="fa-solid fa-chevron-right text-[8px]"></i>
+                    <span>{{ bolum.BolumAdi }}</span>
+                </div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">{{ bolum.BolumAdi }}</h1>
+                <p class="text-xs text-gray-400 font-bold mt-0.5">{{ bolum.DonemAdi }} — {{ bolum.OgretimTuru }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('hoca.hoca_ogrenci_import', bolum_id=bolum.BolumID) }}"
+                   class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-file-excel"></i> Excel İçe Aktar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {# FLASH MESAJLARI #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# TEK ÖĞRENCI EKLEME FORMU #}
+    <form action="{{ url_for('hoca.hoca_ogrenci_ekle', bolum_id=bolum.BolumID) }}" method="POST"
+          class="bg-white p-5 rounded-2xl shadow-lg border border-gray-100">
+        <h3 class="font-black text-gray-700 text-sm mb-4 uppercase tracking-widest">
+            <i class="fa-solid fa-user-plus text-blue-500 mr-2"></i>Öğrenci Ekle
+        </h3>
+        <div class="flex flex-wrap gap-3 items-end">
+            <div class="flex-1 min-w-[140px]">
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Öğrenci No *</label>
+                <input name="ogrenci_no" type="text" placeholder="230207001" required
+                       class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-blue-400 mono">
+            </div>
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ad Soyad</label>
+                <input name="ad_soyad" type="text" placeholder="Ali Yılmaz"
+                       class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-blue-400">
+            </div>
+            <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                <i class="fa-solid fa-plus mr-1"></i> Ekle
+            </button>
+        </div>
+    </form>
+
+    {# ÖĞRENCI TABLOSU #}
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        <div class="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="font-extrabold text-gray-700 text-sm">
+                Kayıtlı Öğrenciler
+                <span class="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-[10px] font-black">{{ ogrenciler|length }}</span>
+            </h2>
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                <input id="ogr-search" type="text" placeholder="Ara: numara veya isim..."
+                    oninput="filterOgrenciler(this.value)"
+                    class="pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-blue-400 w-56">
+            </div>
+        </div>
+        {% if ogrenciler %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
+                        <th class="p-4 font-black">Öğrenci No</th>
+                        <th class="p-4 font-black">Ad Soyad</th>
+                        <th class="p-4 font-black text-center">Portal Kaydı</th>
+                        <th class="p-4 font-black text-center">Kayıt Tarihi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for o in ogrenciler %}
+                    <tr class="hover:bg-gray-50 transition ogr-row" data-search="{{ o.OgrenciNo|lower }} {{ (o.AdSoyad or '')|lower }}">
+                        <td class="p-4 font-mono text-sm font-bold text-blue-600 italic">{{ o.OgrenciNo }}</td>
+                        <td class="p-4 font-black text-gray-800 text-sm">{{ o.AdSoyad or '—' }}</td>
+                        <td class="p-4 text-center">
+                            {% if o.IsApproved %}
+                                <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-black uppercase">
+                                    <i class="fa-solid fa-check"></i> Kayıtlı
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-400 px-2 py-1 rounded-lg text-[10px] font-black uppercase">
+                                    <i class="fa-solid fa-minus"></i> Bekleniyor
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-center text-[11px] text-gray-400 font-bold">
+                            {{ o.KayitTarihi.strftime('%d.%m.%Y') if o.KayitTarihi else '—' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <i class="fa-solid fa-users-slash text-gray-300 text-4xl mb-3"></i>
+            <p class="font-black text-gray-400">Bu bölümde henüz öğrenci yok</p>
+            <p class="text-xs text-gray-400 mt-1">Yukarıdan tek tek ekleyin veya Excel ile toplu aktarın.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+<script>
+    function filterOgrenciler(q) {
+        const term = q.toLowerCase();
+        document.querySelectorAll('.ogr-row').forEach(function(row) {
+            const haystack = row.dataset.search || '';
+            row.style.display = haystack.includes(term) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}

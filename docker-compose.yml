@@ -1,0 +1,40 @@
+services:
+  # ---- PostgreSQL veritabanı ----
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sunum_user
+      POSTGRES_PASSWORD: sunum_pass
+      POSTGRES_DB: sunum_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./supabase_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./seed_data.sql:/docker-entrypoint-initdb.d/02_seed_data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sunum_user -d sunum_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---- Flask uygulaması ----
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      DATABASE_URL: postgresql://sunum_user:sunum_pass@db:5432/sunum_db
+      SECRET_KEY: docker-dev-secret-change-in-production
+      FLASK_DEBUG: "false"
+    volumes:
+      - uploads:/app/static/uploads/kimlikler
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:

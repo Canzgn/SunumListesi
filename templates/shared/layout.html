@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="tr" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunum Yönetim Paneli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .sidebar { transition: all 0.3s; width: 260px; }
+        .main-content { margin-left: 260px; width: calc(100% - 260px); }
+        .nav-link:hover { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
+        .nav-link.active { background-color: rgba(59, 130, 246, 0.2); border-left: 4px solid #3b82f6; color: #1e40af; }
+        #sidebar-overlay { display: none; }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); position: fixed; z-index: 50; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; width: 100%; }
+            #sidebar-overlay.show { display: block; }
+        }
+        .flash-message { animation: fadeOut 0.5s ease 3.5s forwards; }
+        @keyframes fadeOut { to { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; } }
+        /* Dark mode */
+        .dark body, .dark .bg-white { background-color: #1e293b !important; color: #e2e8f0 !important; }
+        .dark .bg-gray-100 { background-color: #0f172a !important; }
+        .dark aside { background-color: #1e293b !important; border-color: #334155 !important; }
+        .dark .bg-white { background-color: #1e293b !important; border-color: #334155 !important; }
+        .dark .text-gray-800, .dark .text-gray-700, .dark .text-gray-600 { color: #e2e8f0 !important; }
+        .dark .text-gray-400, .dark .text-gray-500 { color: #94a3b8 !important; }
+        .dark .border-gray-100, .dark .border-gray-200 { border-color: #334155 !important; }
+        .dark .bg-gray-50, .dark .bg-slate-50 { background-color: #334155 !important; }
+        .dark .divide-gray-100 > * + * { border-color: #334155 !important; }
+    </style>
+</head>
+<body class="bg-gray-100 flex" id="body-root">
+
+    {# Mobil overlay #}
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-40" onclick="toggleSidebar()"></div>
+
+    {# Mobil menü butonu #}
+    <button onclick="toggleSidebar()" class="md:hidden fixed top-4 left-4 z-50 bg-white shadow-lg rounded-xl p-2.5 border border-gray-100">
+        <i class="fa-solid fa-bars text-gray-700"></i>
+    </button>
+
+    <aside id="sidebar" class="sidebar h-screen bg-white shadow-xl fixed left-0 top-0 flex flex-col border-r border-gray-200 overflow-y-auto">
+        <div class="p-8 text-center border-b border-gray-100">
+            {% if session.user_role == 'admin' %}
+                <div class="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-blue-500 p-1">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=random" alt="Admin" class="rounded-full">
+                </div>
+                <h2 class="font-black text-gray-800 text-sm uppercase tracking-tighter">Sistem Yöneticisi</h2>
+                <p class="text-[10px] text-green-500 font-bold">Çevrimiçi</p>
+            {% elif session.user_role == 'hoca' %}
+                <div class="w-20 h-20 bg-purple-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-purple-500 p-1">
+                    <img src="https://ui-avatars.com/api/?name={{ session.hoca_name }}&background=7c3aed&color=fff" alt="Hoca" class="rounded-full">
+                </div>
+                <h2 class="font-black text-gray-800 text-sm uppercase tracking-tighter line-clamp-1">{{ session.hoca_name }}</h2>
+                <p class="text-[10px] text-purple-500 font-bold">Öğretmen</p>
+            {% elif session.user_role == 'kontrolcu' %}
+                <div class="w-20 h-20 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-orange-400 p-1">
+                    <img src="https://ui-avatars.com/api/?name={{ session.kontrolcu_name }}&background=f97316&color=fff" alt="Kontrolcü" class="rounded-full">
+                </div>
+                <h2 class="font-black text-gray-800 text-sm uppercase tracking-tighter line-clamp-1">{{ session.kontrolcu_name }}</h2>
+                <p class="text-[10px] text-orange-500 font-bold">Soru Kontrolcüsü</p>
+            {% else %}
+                <a href="/student/profile/{{ session.student_no }}" class="block group">
+                    <div class="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-emerald-500 group-hover:border-emerald-700 transition p-1">
+                        {% if session.student_photo %}
+                            <img src="/static/uploads/kimlikler/{{ session.student_photo }}" alt="Profile" class="rounded-full w-full h-full object-cover">
+                        {% else %}
+                            <img src="https://ui-avatars.com/api/?name={{ session.student_name or session.student_no }}&background=random" alt="Student" class="rounded-full">
+                        {% endif %}
+                    </div>
+                    <h2 class="font-black text-gray-800 text-sm uppercase tracking-tighter group-hover:text-emerald-700 transition line-clamp-1" title="{{ session.student_name or 'Öğrenci Paneli' }}">
+                        {{ session.student_name or 'Öğrenci Paneli' }}
+                    </h2>
+                    <p class="text-[10px] text-gray-500 font-bold mt-1 group-hover:text-emerald-600 transition">{{ session.student_no }}</p>
+                </a>
+            {% endif %}
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2 mt-4">
+            {% if session.user_role == 'admin' %}
+                <a href="/admin/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/panel' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
+                </a>
+                <a href="/admin/students" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/students' %}active{% endif %}">
+                    <i class="fa-solid fa-users w-6 text-center mr-2"></i> Öğrenci Listesi
+                </a>
+                <a href="/admin/registered_users" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/registered_users' %}active{% endif %}">
+                    <i class="fa-solid fa-address-card w-6 text-center mr-2"></i> Kayıtlı Kullanıcılar
+                </a>
+                <a href="/admin/all_applications" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/all_applications' %}active{% endif %}">
+                    <i class="fa-solid fa-list-ul w-6 text-center mr-2"></i> Konu Seçim Kayıtları
+                </a>
+                <a href="/admin/questions" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/questions' %}active{% endif %}">
+                    <i class="fa-solid fa-question-circle w-6 text-center mr-2"></i> Soru Seçim Kayıtları
+                </a>
+                <a href="/hoca/kontrolcular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/kontrolcular' %}active{% endif %}">
+                    <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Kontrolcüleri
+                </a>
+                <a href="/admin/duyurular" class="nav-link flex items-center p-3 text-yellow-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/duyurular' %}active{% endif %}">
+                    <i class="fa-solid fa-bullhorn w-6 text-center mr-2"></i> Duyurular
+                </a>
+                <a href="/admin/logs" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/logs' %}active{% endif %}">
+                    <i class="fa-solid fa-scroll w-6 text-center mr-2"></i> İşlem Logları
+                </a>
+                <a href="/hoca/takvim" class="nav-link flex items-center p-3 text-teal-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/takvim' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-week w-6 text-center mr-2"></i> Takvim Görünümü
+                </a>
+            {% elif session.user_role == 'hoca' %}
+                <a href="/hoca/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/panel' %}active{% endif %}">
+                    <i class="fa-solid fa-layer-group w-6 text-center mr-2"></i> Genel Bakış
+                </a>
+                <a href="/hoca/sunum_panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/sunum_panel') %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
+                </a>
+                <a href="/hoca/kontrolcular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/kontrolcular' %}active{% endif %}">
+                    <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Kontrolcüleri
+                </a>
+                <a href="/admin/manage_admins" class="nav-link flex items-center p-3 text-amber-700 rounded-xl transition font-bold text-sm {% if request.path == '/admin/manage_admins' %}active{% endif %}">
+                    <i class="fa-solid fa-user-shield w-6 text-center mr-2"></i> Admin Yönetimi
+                </a>
+                <a href="/student/duyurular" class="nav-link flex items-center p-3 text-yellow-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/duyurular' %}active{% endif %}">
+                    <i class="fa-solid fa-bullhorn w-6 text-center mr-2"></i> Duyurular
+                </a>
+                <a href="/hoca/bolum_ekle" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/bolum_ekle' %}active{% endif %}">
+                    <i class="fa-solid fa-plus-circle w-6 text-center mr-2"></i> Yeni Bölüm Ekle
+                </a>
+                <a href="/hoca/konular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/konular' %}active{% endif %}">
+                    <i class="fa-solid fa-book w-6 text-center mr-2"></i> Konu Yönetimi
+                </a>
+                <a href="/hoca/hafta_yonetimi" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/hafta_yonetimi') %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-days w-6 text-center mr-2"></i> Hafta Yönetimi
+                </a>
+                <a href="/hoca/takvim" class="nav-link flex items-center p-3 text-teal-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/takvim' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-week w-6 text-center mr-2"></i> Takvim Görünümü
+                </a>
+                <a href="/hoca/donemler" class="nav-link flex items-center p-3 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/donemler' %}active{% endif %}">
+                    <i class="fa-solid fa-box-archive w-6 text-center mr-2"></i> Dönem Yönetimi
+                </a>
+                <a href="/hoca/ogretmen_ekle" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/ogretmen_ekle' %}active{% endif %}">
+                    <i class="fa-solid fa-user-plus w-6 text-center mr-2"></i> Öğretmen Ekle
+                </a>
+                <a href="/hoca/profil" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/profil' %}active{% endif %}">
+                    <i class="fa-solid fa-id-badge w-6 text-center mr-2"></i> Profilim
+                </a>
+            {% elif session.user_role == 'kontrolcu' %}
+                <a href="/kontrolcu/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/kontrolcu/panel' %}active{% endif %}">
+                    <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Onay Paneli
+                </a>
+            {% elif session.user_role == 'student' %}
+                <a href="/student/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/panel' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
+                </a>
+                <a href="/student/all_applications" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/all_applications' %}active{% endif %}">
+                    <i class="fa-solid fa-list-ul w-6 text-center mr-2"></i> Konu Seçim Kayıtları
+                </a>
+                <a href="/student/questions" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/questions' %}active{% endif %}">
+                    <i class="fa-solid fa-question-circle w-6 text-center mr-2"></i> Soru Seçim Kayıtları
+                </a>
+                <a href="/student/duyurular" class="nav-link flex items-center p-3 text-yellow-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/duyurular' %}active{% endif %}">
+                    <i class="fa-solid fa-bullhorn w-6 text-center mr-2"></i> Duyurular
+                </a>
+                <a href="/student/profile_edit" class="nav-link flex items-center p-3 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/profile_edit' %}active{% endif %}">
+                    <i class="fa-solid fa-user-pen w-6 text-center mr-2"></i> Profil Düzenle
+                </a>
+            {% endif %}
+        </nav>
+
+        <div class="p-4 border-t border-gray-100 space-y-1">
+            <!-- Duyuru Zili -->
+            <a href="{% if session.user_role == 'admin' %}/admin/duyurular{% else %}/student/duyurular{% endif %}"
+               class="flex items-center w-full p-3 text-gray-600 rounded-xl hover:bg-yellow-50 transition font-bold text-sm">
+                <i class="fa-solid fa-bell w-6 text-center mr-2 text-yellow-500"></i>
+                Duyurular
+                <span id="duyuru-badge" class="ml-auto bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 hidden">0</span>
+            </a>
+            <!-- Şifre Değiştir -->
+            <button onclick="document.getElementById('sifre-modal').classList.remove('hidden')"
+                class="flex items-center w-full p-3 text-gray-600 rounded-xl hover:bg-gray-100 transition font-bold text-sm">
+                <i class="fa-solid fa-key w-6 text-center mr-2 text-green-600"></i> Şifre Değiştir
+            </button>
+            <!-- Dark Mode Toggle -->
+            <button onclick="toggleDarkMode()" id="dark-mode-btn" class="flex items-center w-full p-3 text-gray-600 rounded-xl hover:bg-gray-100 transition font-bold text-sm">
+                <i class="fa-solid fa-moon w-6 text-center mr-2 text-indigo-500" id="dark-icon"></i>
+                <span id="dark-label">Koyu Mod</span>
+            </button>
+            <!-- Çıkış -->
+            <a href="/logout" class="flex items-center p-3 text-red-500 rounded-xl hover:bg-red-50 transition font-black text-sm">
+                <i class="fa-solid fa-right-from-bracket w-6 text-center mr-2"></i> ÇIKIŞ YAP
+            </a>
+        </div>
+    </aside>
+
+    <main class="main-content min-h-screen p-4 md:p-8 pt-16 md:pt-8">
+
+        {# ===== GLOBAL FLASH MESAJLARI ===== #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div id="flash-container" class="mb-4 space-y-2">
+              {% for category, message in messages %}
+                <div class="flash-message flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm shadow-sm border
+                    {% if category == 'error' %}bg-red-50 text-red-800 border-red-200
+                    {% else %}bg-blue-50 text-blue-800 border-blue-100{% endif %}">
+                    <i class="fa-solid {% if category == 'error' %}fa-circle-xmark text-red-500{% else %}fa-circle-info text-blue-500{% endif %} flex-shrink-0"></i>
+                    <span>{{ message }}</span>
+                    <button onclick="this.parentElement.remove()" class="ml-auto text-gray-400 hover:text-gray-600 transition">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        /* ---- Sidebar toggle ---- */
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        }
+
+        /* ---- Dark Mode ---- */
+        (function applyDarkMode() {
+            if (localStorage.getItem('darkMode') === '1') {
+                document.getElementById('html-root').classList.add('dark');
+                document.getElementById('body-root').classList.add('dark');
+            }
+        })();
+
+        function toggleDarkMode() {
+            const html = document.getElementById('html-root');
+            const body = document.getElementById('body-root');
+            const icon = document.getElementById('dark-icon');
+            const label = document.getElementById('dark-label');
+            const isDark = html.classList.toggle('dark');
+            body.classList.toggle('dark', isDark);
+            localStorage.setItem('darkMode', isDark ? '1' : '0');
+            icon.className = isDark ? 'fa-solid fa-sun w-6 text-center mr-2 text-yellow-400'
+                                    : 'fa-solid fa-moon w-6 text-center mr-2 text-indigo-500';
+            label.textContent = isDark ? 'Açık Mod' : 'Koyu Mod';
+        }
+
+        // Set initial icon state
+        (function setDarkModeIcon() {
+            if (localStorage.getItem('darkMode') === '1') {
+                const icon = document.getElementById('dark-icon');
+                const label = document.getElementById('dark-label');
+                if (icon) { icon.className = 'fa-solid fa-sun w-6 text-center mr-2 text-yellow-400'; }
+                if (label) { label.textContent = 'Açık Mod'; }
+            }
+        })();
+
+        /* ---- Duyuru Badge (sayı gösterimi) ---- */
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // Sayfa yüklenince badge güncelle
+        fetch('/api/duyurular')
+            .then(r => r.json())
+            .then(data => {
+                if (data.length) {
+                    const badge = document.getElementById('duyuru-badge');
+                    if (badge) { badge.textContent = data.length; badge.classList.remove('hidden'); }
+                }
+            }).catch(() => {});
+    </script>
+
+    <!-- ŞİFRE DEĞİŞTİR MODALI -->
+    <div id="sifre-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-key text-green-600 mr-2"></i>Şifre Değiştir</h3>
+                <button onclick="document.getElementById('sifre-modal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            {% if session.user_role == 'hoca' %}
+                <form method="POST" action="/hoca/sifre_degistir" class="space-y-3">
+            {% elif session.user_role == 'admin' %}
+                <form method="POST" action="/admin/sifre_degistir" class="space-y-3">
+            {% elif session.user_role == 'kontrolcu' %}
+                <form method="POST" action="/kontrolcu/sifre_degistir" class="space-y-3">
+            {% elif session.user_role == 'student' %}
+                <form method="POST" action="/student/profile_edit" class="space-y-3">
+                <input type="hidden" name="action" value="change_password">
+            {% else %}
+                <form class="space-y-3">
+            {% endif %}
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Mevcut Şifre</label>
+                    <input type="password" name="old_password" required
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Yeni Şifre <span class="text-gray-400 font-normal">(min. 6 karakter)</span></label>
+                    <input type="password" name="new_password" required minlength="6"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Yeni Şifre (Tekrar)</label>
+                    <input type="password" name="new_password2" required minlength="6"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-400 outline-none">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit"
+                        class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-sm transition">
+                        Kaydet
+                    </button>
+                    <button type="button" onclick="document.getElementById('sifre-modal').classList.add('hidden')"
+                        class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 rounded-lg text-sm transition">
+                        İptal
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

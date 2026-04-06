@@ -1,0 +1,101 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <div class="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-lg border-b-4 border-blue-600 gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Kayıtlı Öğrenciler</h1>
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-widest italic">Sisteme kayıt olan tüm öğrencileri ve yüklenen kimlikleri buradan yönetebilirsiniz.</p>
+        </div>
+        
+        <form action="/admin/add_registered_user" method="POST" class="flex flex-wrap gap-2 items-center bg-gray-50 p-2 rounded-xl border">
+            <input type="text" name="ogrenci_no" placeholder="Öğrenci No" required class="p-2 border rounded-lg text-xs font-bold outline-none w-28">
+            <input type="text" name="ad_soyad" placeholder="Ad Soyad" required class="p-2 border rounded-lg text-xs font-bold outline-none w-36">
+            <select name="ogretim_turu" class="p-2 border rounded-lg text-xs font-bold outline-none">
+                <option value="Örgün">Örgün</option>
+                <option value="Gece">Gece</option>
+            </select>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg font-black text-xs transition">
+                <i class="fa-solid fa-plus text-[10px] mr-1"></i> Ekle
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
+                    <th class="p-4 font-black">Numara</th>
+                    <th class="p-4 font-black">Ad Soyad</th>
+                    <th class="p-4 font-black">Öğretim Türü</th>
+                    <th class="p-4 font-black text-center">Durum</th>
+                    <th class="p-4 font-black text-center">Kayıt Tarihi</th>
+                    <th class="p-4 font-black text-center">Kimlik Fotoğrafı</th>
+                    <th class="p-4 font-black text-center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for u in users %}
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="p-4 font-mono text-sm font-bold text-blue-600 italic">
+                        <a href="/admin/student/{{ u.OgrenciNo }}" class="hover:underline" title="Öğrenci Profili">{{ u.OgrenciNo }}</a>
+                    </td>
+                    <td class="p-4 font-black text-gray-800">{{ u.AdSoyad }}</td>
+                    <td class="p-4 text-xs font-bold text-gray-500">{{ u.OgretimTuru }}</td>
+                    
+                    <td class="p-4 text-center">
+                        {% if u.IsApproved %}
+                            <span class="px-2 py-1 rounded bg-green-100 text-green-700 text-[10px] font-black uppercase"><i class="fa-solid fa-check"></i> Onaylı</span>
+                        {% else %}
+                            <span class="px-2 py-1 rounded bg-orange-100 text-orange-700 text-[10px] font-black uppercase"><i class="fa-solid fa-clock"></i> Beklemede</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="p-4 text-center text-xs font-bold text-gray-500">
+                        {% if u.KayitTarihi %}
+                            {{ u.KayitTarihi }}
+                        {% else %}
+                            - 
+                        {% endif %}
+                    </td>
+
+                    <td class="p-4 text-center">
+                        {% if u.KimlikFoto %}
+                            <a href="/static/uploads/kimlikler/{{ u.KimlikFoto }}" target="_blank" class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                <i class="fa-solid fa-image"></i> Görüntüle
+                            </a>
+                        {% else %}
+                            <span class="text-xs text-gray-400 italic font-bold">Yüklenmedi</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td class="p-4 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            {% if not u.IsApproved %}
+                                <form action="{{ url_for('admin.approve_student_account', student_id=u.OgrenciID) }}" method="POST" style="display:inline">
+                                    <input type="hidden" name="redirect_to" value="registered_users">
+                                    <button type="submit" class="text-[10px] bg-green-100 text-green-700 px-2 py-1.5 rounded-lg font-black hover:bg-green-600 hover:text-white transition uppercase" title="Giriş onaylı ver">
+                                        <i class="fa-solid fa-check"></i> Onayla
+                                    </button>
+                                </form>
+                            {% endif %}
+                            
+                            <form action="/admin/delete_registered_user/{{ u.OgrenciID }}" method="POST" class="inline" onsubmit="return confirm('{{ u.OgrenciNo }} numaralı öğrenciyi sistemden tamamen silmek istediğinize emin misiniz? (Tüm atama ve başvuruları da etkilenebilir)')">
+                                <button type="submit" class="text-[10px] bg-red-100 text-red-700 px-2 py-1.5 rounded-lg font-black hover:bg-red-600 hover:text-white transition uppercase tooltip-btn" title="Kullanıcıyı Sil">
+                                    <i class="fa-solid fa-trash-can"></i> Sil
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="p-8 text-center text-gray-400 font-bold italic">Sistemde hiç kayıtlı öğrenci bulunmuyor.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

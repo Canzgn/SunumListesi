@@ -1,0 +1,53 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-lg border-b-4 border-purple-600">
+        <div>
+            <h1 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Konu Seçim Kayıtları</h1>
+            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest italic">Excel'den gelen tüm ham veriler ve zaman damgaları</p>
+        </div>
+        <button class="bg-purple-600 text-white px-5 py-2 rounded-xl font-black text-xs opacity-50 cursor-not-allowed shadow-md">
+            <i class="fa-solid fa-plus mr-2"></i> MANUEL KAYIT EKLE (YAKINDA)
+        </button>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        <table class="w-full text-left">
+            <thead>
+    <tr class="bg-slate-800 text-white text-[10px] uppercase tracking-widest">
+        <th class="p-4 font-black">
+            <a href="/admin/all_applications?sort={{ 'asc' if current_sort == 'desc' else 'desc' }}" class="flex items-center hover:text-purple-400 transition">
+                Zaman Damgası 
+                <i class="fa-solid fa-sort ml-2 {% if current_sort == 'asc' %}fa-sort-up{% else %}fa-sort-down{% endif %} text-purple-500"></i>
+            </a>
+        </th>
+        <th class="p-4 font-black">Hafta</th>
+        <th class="p-4 font-black">Konu</th>
+        <th class="p-4 font-black">Öğretim</th>
+        <th class="p-4 font-black">Öğrenci 1</th>
+        <th class="p-4 font-black">Öğrenci 2</th>
+        <th class="p-4 font-black">Sıra</th>
+    </tr>
+</thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for app in applications %}
+                <tr class="hover:bg-purple-50 transition border-l-4 border-transparent hover:border-purple-400">
+                    <td class="p-4 font-mono text-[11px] text-purple-600 font-bold">
+                        {{ app.ZamanDamgasi.strftime('%d.%m.%Y %H:%M:%S') if app.ZamanDamgasi else '--' }}
+                    </td>
+                    <td class="p-4"><span class="bg-gray-100 px-2 py-1 rounded text-[10px] font-black italic">{{ app.HaftaNo }}. Hafta</span></td>
+                    <td class="p-4 text-xs font-bold text-gray-700 max-w-[200px] truncate">
+                        <a href="/admin/panel?tur={{ app.OgretimTuru }}#sunum-{{ app.SunumID }}" class="text-blue-600 hover:underline">{{ app.KonuAdi }}</a>
+                    </td>
+                    <td class="p-4 text-[10px] font-black uppercase text-gray-400">{{ app.OgretimTuru }}</td>
+                    <td class="p-4 font-black text-xs text-gray-800">{{ app.Ogrenci1No }}</td>
+                    <td class="p-4 font-black text-xs text-gray-800">{{ app.Ogrenci2No if app.Ogrenci2No != '0' else '---' }}</td>
+                    <td class="p-4"><span class="text-xs font-black text-blue-500">#{{ app.OncelikSirasi }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

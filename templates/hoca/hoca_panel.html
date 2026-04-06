@@ -1,0 +1,190 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    {# BAŞLIK + DÖNEM FİLTRESİ #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-purple-600">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Genel Bakış</h1>
+                <p class="text-xs text-gray-500 font-medium mt-1">Bölümlerinizi ve öğrencilerinizi yönetin.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                {# Dönem Filtresi #}
+                <form action="{{ url_for('hoca.hoca_panel') }}" method="GET" class="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded-xl border border-purple-200">
+                    <label class="text-[10px] font-black text-purple-700 uppercase tracking-widest">Dönem</label>
+                    <select name="donem_id" onchange="this.form.submit()"
+                            class="bg-transparent font-bold text-purple-900 outline-none text-xs p-1">
+                        <option value="">Tümü</option>
+                        {% for d in donemler %}
+                        <option value="{{ d.DonemID }}" {% if secili_donem_id == d.DonemID|string %}selected{% endif %}>
+                            {{ d.DonemAdi }}{% if d.Aktif %} ●{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+                <a href="{{ url_for('hoca.hoca_bolum_ekle') }}"
+                   class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-plus"></i> Yeni Bölüm
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {# FLASH MESAJLARI #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# ÖZET İSTATİSTİKLER #}
+    {% set toplam_ogr = bolum_stats | sum(attribute='ogr_sayi') %}
+    {% set toplam_onaylanan = bolum_stats | sum(attribute='onaylanan_sayi') %}
+    {% set toplam_sunum = bolum_stats | sum(attribute='sunum_sayi') %}
+    {% set toplam_atanan = bolum_stats | sum(attribute='atanan_sayi') %}
+    {% if bolum_stats %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-blue-500 flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-users text-blue-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Toplam Öğrenci</p>
+                <p class="text-2xl font-black text-gray-800">{{ toplam_ogr }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-emerald-500 flex items-center gap-3">
+            <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-user-check text-emerald-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Aktif Kayıt</p>
+                <p class="text-2xl font-black text-emerald-600">{{ toplam_onaylanan }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-purple-500 flex items-center gap-3">
+            <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-calendar-days text-purple-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Sunum Slotu</p>
+                <p class="text-2xl font-black text-purple-600">{{ toplam_sunum }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-orange-400 flex items-center gap-3">
+            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-circle-check text-orange-500 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Atanan Sunum</p>
+                <p class="text-2xl font-black text-orange-500">{{ toplam_atanan }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# DÖNEM EKLEME #}
+    <details class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <summary class="p-5 font-black text-gray-700 cursor-pointer flex items-center gap-2 hover:bg-gray-50 transition">
+            <i class="fa-solid fa-calendar-plus text-purple-500"></i> Yeni Dönem Ekle
+        </summary>
+        <form action="{{ url_for('hoca.hoca_donem_ekle') }}" method="POST" class="p-5 border-t border-gray-100">
+            <div class="flex flex-wrap gap-4 items-end">
+                <div class="flex-1 min-w-[160px]">
+                    <label class="block text-[11px] font-black text-gray-500 uppercase tracking-widest mb-1">Dönem Adı</label>
+                    <input name="donem_adi" type="text" placeholder="örn: 2026/27" required
+                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-purple-400">
+                </div>
+                <div class="flex items-center gap-2 pb-2">
+                    <input type="checkbox" name="aktif" id="donem_aktif" class="w-4 h-4 accent-purple-600">
+                    <label for="donem_aktif" class="text-sm font-bold text-gray-700 cursor-pointer">Aktif Dönem Yap</label>
+                </div>
+                <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    Ekle
+                </button>
+            </div>
+        </form>
+    </details>
+
+    {# DÖNEM SEKME BAR #}
+    {% if donemler %}
+    <div class="flex flex-wrap gap-2">
+        {% for d in donemler %}
+        <a href="{{ url_for('hoca.hoca_panel', donem_id=d.DonemID) }}"
+           class="px-4 py-2 rounded-xl text-xs font-black border transition
+           {% if secili_donem_id == d.DonemID|string %}bg-purple-600 text-white border-purple-600{% else %}bg-white text-gray-600 border-gray-200 hover:border-purple-400 hover:text-purple-600{% endif %}">
+            <i class="fa-solid fa-calendar-check mr-1"></i>{{ d.DonemAdi }}
+            {% if d.Aktif %}<span class="ml-1.5 bg-white/30 text-[9px] px-1.5 py-0.5 rounded-full uppercase font-black">Aktif</span>{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# BÖLÜM KARTLARI #}
+    {% if bolum_stats %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for item in bolum_stats %}
+        {% set b = item.bolum %}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <div class="p-5 border-b border-gray-50">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <h3 class="font-black text-gray-800 text-sm leading-tight">{{ b.BolumAdi }}</h3>
+                        <p class="text-[11px] text-gray-400 font-bold mt-0.5">{{ b.DonemAdi }}</p>
+                    </div>
+                    <span class="px-2 py-1 rounded-lg text-[10px] font-black uppercase flex-shrink-0
+                        {% if b.OgretimTuru == 'Örgün' %}bg-amber-50 text-amber-700{% else %}bg-indigo-50 text-indigo-700{% endif %}">
+                        <i class="fa-solid {% if b.OgretimTuru == 'Örgün' %}fa-sun{% else %}fa-moon{% endif %} mr-1"></i>{{ b.OgretimTuru }}
+                    </span>
+                </div>
+            </div>
+            <div class="grid grid-cols-4 divide-x divide-gray-100">
+                <div class="p-3 text-center">
+                    <p class="text-xl font-black text-blue-600">{{ item.ogr_sayi }}</p>
+                    <p class="text-[9px] text-gray-400 font-black uppercase tracking-wide">Öğrenci</p>
+                </div>
+                <div class="p-3 text-center">
+                    <p class="text-xl font-black text-emerald-600">{{ item.onaylanan_sayi }}</p>
+                    <p class="text-[9px] text-gray-400 font-black uppercase tracking-wide">Aktif</p>
+                </div>
+                <div class="p-3 text-center">
+                    <p class="text-xl font-black text-purple-600">{{ item.sunum_sayi }}</p>
+                    <p class="text-[9px] text-gray-400 font-black uppercase tracking-wide">Slot</p>
+                </div>
+                <div class="p-3 text-center">
+                    <p class="text-xl font-black text-orange-500">{{ item.atanan_sayi }}</p>
+                    <p class="text-[9px] text-gray-400 font-black uppercase tracking-wide">Atandı</p>
+                </div>
+            </div>
+            <div class="p-3 bg-gray-50 flex gap-2">
+                <a href="{{ url_for('hoca.hoca_ogrenci_listesi', bolum_id=b.BolumID) }}"
+                   class="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-black text-[11px] transition">
+                    <i class="fa-solid fa-users mr-1"></i> Öğrenciler
+                </a>
+                <a href="{{ url_for('hoca.hoca_sunum_panel', bolum_id=b.BolumID) }}"
+                   class="flex-1 text-center bg-gray-700 hover:bg-gray-800 text-white py-1.5 rounded-lg font-black text-[11px] transition">
+                    <i class="fa-solid fa-calendar-check mr-1"></i> Sunum Paneli
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-12 text-center">
+        <i class="fa-solid fa-folder-open text-gray-300 text-5xl mb-4"></i>
+        <p class="font-black text-gray-400 text-lg">Bu dönemde bölüm yok</p>
+        <p class="text-gray-400 text-sm mt-1">Yeni bir bölüm ekleyerek başlayın.</p>
+        <a href="{{ url_for('hoca.hoca_bolum_ekle') }}"
+           class="inline-flex items-center gap-2 mt-4 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl font-black text-sm transition shadow-sm">
+            <i class="fa-solid fa-plus"></i> Bölüm Ekle
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

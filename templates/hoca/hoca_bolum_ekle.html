@@ -1,0 +1,111 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+
+    {# BAŞLIK #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-purple-600 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Yeni Bölüm Ekle</h1>
+            <p class="text-xs text-gray-500 font-medium mt-1">Oluşturduğunuz bölüme otomatik olarak atanırsınız.</p>
+        </div>
+        <a href="{{ url_for('hoca.hoca_panel') }}"
+           class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition">
+            <i class="fa-solid fa-arrow-left"></i> Geri
+        </a>
+    </div>
+
+    {# FLASH MESAJLARI #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# FORM #}
+    <form action="{{ url_for('hoca.hoca_bolum_ekle') }}" method="POST" class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="p-6 space-y-5">
+
+            {# Bölüm Adı #}
+            <div>
+                <label class="block text-[11px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Bölüm Adı *</label>
+                <input name="bolum_adi" type="text" placeholder="örn: Bilgisayar Mühendisliği" required
+                       class="w-full border border-gray-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition">
+            </div>
+
+            {# Öğretim Türü #}
+            <div>
+                <label class="block text-[11px] font-black text-gray-500 uppercase tracking-widest mb-2">Öğretim Türü *</label>
+                <div class="flex gap-3">
+                    <label class="flex-1 flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 transition has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+                        <input type="radio" name="ogretim_turu" value="Örgün" checked class="accent-purple-600">
+                        <div>
+                            <p class="font-black text-sm text-gray-700">Örgün</p>
+                            <p class="text-[10px] text-gray-400">Gündüz eğitim</p>
+                        </div>
+                    </label>
+                    <label class="flex-1 flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 transition has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+                        <input type="radio" name="ogretim_turu" value="Gece" class="accent-purple-600">
+                        <div>
+                            <p class="font-black text-sm text-gray-700">Gece</p>
+                            <p class="text-[10px] text-gray-400">İkinci öğretim</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            {# Dönem #}
+            <div>
+                <label class="block text-[11px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Dönem *</label>
+                <select name="donem_id" required
+                        class="w-full border border-gray-200 rounded-xl px-4 py-3 font-bold text-sm outline-none focus:border-purple-400 bg-white">
+                    {% for d in donemler %}
+                    <option value="{{ d.DonemID }}" {% if d.Aktif %}selected{% endif %}>
+                        {{ d.DonemAdi }}{% if d.Aktif %} (Aktif){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Öğrenci Aktarma #}
+            <div>
+                <label class="block text-[11px] font-black text-gray-500 uppercase tracking-widest mb-2">Bölüm Oluştuktan Sonra</label>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                        <input type="radio" name="ogr_import" value="manual" checked class="accent-purple-600">
+                        <div>
+                            <p class="font-bold text-sm text-gray-700">Öğrenci listesine git</p>
+                            <p class="text-[10px] text-gray-400">Tek tek öğrenci ekleyebilirsiniz</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                        <input type="radio" name="ogr_import" value="excel" class="accent-purple-600">
+                        <div>
+                            <p class="font-bold text-sm text-gray-700">Excel ile toplu içe aktar</p>
+                            <p class="text-[10px] text-gray-400">xlsx / xls dosyasından öğrenci aktarın</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                        <input type="radio" name="ogr_import" value="none" class="accent-purple-600">
+                        <div>
+                            <p class="font-bold text-sm text-gray-700">Şimdilik geç</p>
+                            <p class="text-[10px] text-gray-400">Ana panele dön</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-5 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <button type="submit"
+                    class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-black text-sm transition shadow-sm">
+                <i class="fa-solid fa-check"></i> Bölümü Oluştur
+            </button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

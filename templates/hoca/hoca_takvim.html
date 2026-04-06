@@ -1,0 +1,127 @@
+﻿{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-teal-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Takvim Görünümü</h1>
+            <p class="text-xs text-gray-500 font-medium mt-1">Sunum haftalarını takvim üzerinde görüntüleyin.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <select id="tur-filter" onchange="fetchEvents()"
+                    class="border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-teal-400">
+                <option value="">Tüm Türler</option>
+                <option value="Örgün">Örgün</option>
+                <option value="Gece">Gece</option>
+            </select>
+            <select id="bolum-filter" onchange="fetchEvents()"
+                    class="border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-teal-400">
+                <option value="">Tüm Bölümler</option>
+            </select>
+        </div>
+    </div>
+
+    {# RENK LEJANDI #}
+    <div class="flex items-center gap-4 flex-wrap text-xs font-bold text-gray-600">
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>Örgün (Bekliyor)</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-violet-500 inline-block"></span>Gece (Bekliyor)</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>Atandı</span>
+    </div>
+
+    {# TAKVİM #}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+        <div id="calendar"></div>
+    </div>
+
+    {# DETAY MODAL #}
+    <div id="event-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="font-black text-gray-800 text-lg" id="modal-konu">—</h3>
+                <button onclick="document.getElementById('event-modal').classList.add('hidden')"
+                        class="text-gray-400 hover:text-gray-600 ml-4 flex-shrink-0">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-400 font-medium">Hafta</span>
+                    <span class="font-black text-gray-700" id="modal-hafta">—</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400 font-medium">Öğretim Türü</span>
+                    <span class="font-black text-gray-700" id="modal-tur">—</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400 font-medium">Atanan Öğrenci</span>
+                    <span class="font-bold text-gray-700 text-right ml-4" id="modal-atanan">—</span>
+                </div>
+            </div>
+            <a id="modal-link" href="#" class="mt-4 block text-center text-xs font-black text-teal-600 hover:text-teal-800 transition">
+                Detay Sayfasına Git →
+            </a>
+        </div>
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+let calendar;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const calEl = document.getElementById('calendar');
+    calendar = new FullCalendar.Calendar(calEl, {
+        initialView: 'dayGridMonth',
+        locale: 'tr',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listMonth'
+        },
+        displayEventTime: false,
+        eventClick: function(info) {
+            const props = info.event.extendedProps;
+            document.getElementById('modal-konu').textContent = props.konu;
+            document.getElementById('modal-hafta').textContent = props.hafta + '. Hafta';
+            document.getElementById('modal-tur').textContent = props.tur;
+            document.getElementById('modal-atanan').textContent = props.atananlar;
+            document.getElementById('modal-link').href = '/admin/topic/' + props.sunum_id;
+            document.getElementById('event-modal').classList.remove('hidden');
+        },
+        height: 'auto'
+    });
+    calendar.render();
+    fetchEvents();
+    loadBolumler();
+});
+
+function fetchEvents() {
+    const tur = document.getElementById('tur-filter').value;
+    const bolum = document.getElementById('bolum-filter').value;
+    let url = '/api/takvim_events?';
+    if (tur) url += 'tur=' + encodeURIComponent(tur) + '&';
+    if (bolum) url += 'bolum_id=' + encodeURIComponent(bolum);
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            calendar.removeAllEvents();
+            calendar.addEventSource(data);
+        }).catch(function(e) { console.error('Takvim yükleme hatası:', e); });
+}
+
+function loadBolumler() {
+    fetch('/api/bolumler_list')
+        .then(r => r.json())
+        .then(data => {
+            const sel = document.getElementById('bolum-filter');
+            data.forEach(function(b) {
+                const opt = document.createElement('option');
+                opt.value = b.id; opt.textContent = b.adi;
+                sel.appendChild(opt);
+            });
+        }).catch(function() {});
+}
+</script>
+{% endblock %}

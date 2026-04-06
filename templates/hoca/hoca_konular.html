@@ -1,0 +1,128 @@
+﻿{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-purple-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Konu Yönetimi</h1>
+            <p class="text-xs text-gray-500 font-medium mt-1">Ders konularını buradan ekleyebilir, düzenleyebilir ve silebilirsiniz.</p>
+        </div>
+        <div class="text-right">
+            <span class="text-3xl font-black text-purple-600">{{ konular|length }}</span>
+            <p class="text-[10px] font-black text-gray-400 uppercase">Toplam Konu</p>
+        </div>
+    </div>
+
+    {# YENİ KONU EKLEME #}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <h3 class="font-black text-gray-700 text-sm mb-4 uppercase tracking-widest">
+            <i class="fa-solid fa-plus-circle text-purple-500 mr-2"></i>Yeni Konu Ekle
+        </h3>
+        <form action="{{ url_for('hoca.hoca_konu_ekle') }}" method="POST" class="flex flex-col sm:flex-row gap-3">
+            <input type="text" name="konu_adi" required placeholder="Konu adı (örn: Docker Fundamentals)"
+                   class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100">
+            <input type="number" name="sira_no" placeholder="Sıra No" min="1"
+                   class="w-28 border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100">
+            <button type="submit"
+                    class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl font-black text-sm transition whitespace-nowrap">
+                <i class="fa-solid fa-plus mr-1"></i>Ekle
+            </button>
+        </form>
+    </div>
+
+    {# KONU LİSTESİ #}
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        {% if konular %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
+                        <th class="p-4 font-black">Sıra</th>
+                        <th class="p-4 font-black">Konu Adı</th>
+                        <th class="p-4 font-black text-center">Sunum Slotu</th>
+                        <th class="p-4 font-black text-center">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for k in konular %}
+                    <tr class="hover:bg-gray-50 transition" id="konu-row-{{ k.KonuID }}">
+                        <td class="p-3 font-black text-gray-500 w-16 text-center">{{ k.SiraNo }}</td>
+                        <td class="p-3">
+                            <div id="label-{{ k.KonuID }}">
+                                <span class="font-bold text-sm text-gray-800">{{ k.KonuAdi }}</span>
+                            </div>
+                            <form id="edit-form-{{ k.KonuID }}" class="hidden"
+                                  action="{{ url_for('hoca.hoca_konu_duzenle', konu_id=k.KonuID) }}" method="POST">
+                                <div class="flex gap-2 items-center">
+                                    <input type="text" name="konu_adi" value="{{ k.KonuAdi }}" required
+                                           class="flex-1 border border-purple-300 rounded-lg px-3 py-1 text-sm font-medium outline-none focus:border-purple-500">
+                                    <input type="number" name="sira_no" value="{{ k.SiraNo }}" min="1"
+                                           class="w-20 border border-purple-300 rounded-lg px-2 py-1 text-sm font-medium outline-none text-center">
+                                    <button type="submit"
+                                            class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-black text-xs transition">
+                                        Kaydet
+                                    </button>
+                                    <button type="button" onclick="toggleEdit({{ k.KonuID }})"
+                                            class="text-gray-400 hover:text-gray-600 text-xs font-bold px-2">
+                                        İptal
+                                    </button>
+                                </div>
+                            </form>
+                        </td>
+                        <td class="p-3 text-center">
+                            {% set kullanim = kullanim_map.get(k.KonuID, 0) %}
+                            {% if kullanim > 0 %}
+                                <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-black">
+                                    <i class="fa-solid fa-calendar-check"></i> {{ kullanim }} slot
+                                </span>
+                            {% else %}
+                                <span class="text-gray-300 text-[11px] font-bold">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <button type="button" onclick="toggleEdit({{ k.KonuID }})"
+                                        class="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg font-black text-[11px] transition">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                {% if kullanim_map.get(k.KonuID, 0) == 0 %}
+                                <form action="{{ url_for('hoca.hoca_konu_sil', konu_id=k.KonuID) }}" method="POST"
+                                      onsubmit="return confirm('{{ k.KonuAdi }} silinsin mi?')">
+                                    <button type="submit"
+                                            class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-black text-[11px] transition">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button type="button" disabled title="Slotlarda kullanılıyor — silinemez"
+                                        class="bg-gray-50 text-gray-300 border border-gray-200 px-3 py-1.5 rounded-lg font-black text-[11px] cursor-not-allowed">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <i class="fa-solid fa-book-open text-gray-300 text-5xl mb-4"></i>
+            <p class="font-black text-gray-400 text-lg">Henüz konu yok</p>
+            <p class="text-gray-400 text-sm mt-1">Yukarıdaki formdan ilk konuyu ekleyin.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function toggleEdit(id) {
+    const label = document.getElementById('label-' + id);
+    const form = document.getElementById('edit-form-' + id);
+    label.classList.toggle('hidden');
+    form.classList.toggle('hidden');
+}
+</script>
+{% endblock %}

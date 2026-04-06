@@ -1,0 +1,83 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+
+    {# BAŞLIK #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-green-600">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                    <a href="{{ url_for('hoca.hoca_panel') }}" class="hover:text-purple-600 transition">Panel</a>
+                    <i class="fa-solid fa-chevron-right text-[8px]"></i>
+                    <a href="{{ url_for('hoca.hoca_ogrenci_listesi', bolum_id=bolum.BolumID) }}" class="hover:text-blue-600 transition">{{ bolum.BolumAdi }}</a>
+                    <i class="fa-solid fa-chevron-right text-[8px]"></i>
+                    <span>Excel İçe Aktar</span>
+                </div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Excel İçe Aktar</h1>
+                <p class="text-xs text-gray-400 font-bold mt-0.5">{{ bolum.BolumAdi }} — {{ bolum.DonemAdi }} — {{ bolum.OgretimTuru }}</p>
+            </div>
+            <a href="{{ url_for('hoca.hoca_ogrenci_listesi', bolum_id=bolum.BolumID) }}"
+               class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition flex-shrink-0">
+                <i class="fa-solid fa-arrow-left"></i> Geri
+            </a>
+        </div>
+    </div>
+
+    {# FLASH MESAJLARI #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {# AÇIKLAMA #}
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-sm text-blue-800">
+        <p class="font-black mb-2"><i class="fa-solid fa-circle-info mr-2"></i>Excel Dosyası Formatı</p>
+        <ul class="space-y-1 font-bold text-xs text-blue-700 list-disc list-inside">
+            <li>1. sütun: Öğrenci numarası</li>
+            <li>2. sütun: Ad Soyad (opsiyonel)</li>
+            <li>Başlık satırı olabilir — sayısal olmayan ilk sütun değerleri atlanır</li>
+            <li>Mevcut öğrenciler güncellenir, yeni öğrenciler eklenir</li>
+        </ul>
+    </div>
+
+    {# UPLOAD FORMU #}
+    <form action="{{ url_for('hoca.hoca_ogrenci_import', bolum_id=bolum.BolumID) }}" method="POST"
+          enctype="multipart/form-data"
+          class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="p-6">
+            <label class="block text-[11px] font-black text-gray-500 uppercase tracking-widest mb-3">Excel Dosyası Seç</label>
+            <label class="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition group"
+                   id="drop-area">
+                <i class="fa-solid fa-file-excel text-4xl text-gray-300 group-hover:text-green-500 transition mb-3"></i>
+                <p class="font-black text-gray-400 group-hover:text-green-600 transition text-sm">Dosya seç veya buraya sürükle</p>
+                <p class="text-[10px] text-gray-400 mt-1 font-bold">.xlsx veya .xls</p>
+                <p id="file-name" class="mt-2 text-xs font-black text-green-600 hidden"></p>
+                <input type="file" name="excel_file" id="excel-input" accept=".xlsx,.xls" required class="hidden"
+                       onchange="showFileName(this)">
+            </label>
+        </div>
+        <div class="p-5 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <button type="submit"
+                    class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-black text-sm transition shadow-sm">
+                <i class="fa-solid fa-upload"></i> İçe Aktar
+            </button>
+        </div>
+    </form>
+
+</div>
+
+<script>
+function showFileName(input) {
+    const nameEl = document.getElementById('file-name');
+    if (input.files && input.files[0]) {
+        nameEl.textContent = input.files[0].name;
+        nameEl.classList.remove('hidden');
+    }
+}
+</script>
+{% endblock %}

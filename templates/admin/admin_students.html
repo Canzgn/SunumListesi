@@ -1,0 +1,125 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-6 rounded-2xl shadow-lg border-b-4 border-green-600 gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Öğrenci Yönetimi</h1>
+            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest italic">Sıralama için "Hafta / Durum" başlığına tıklayın.</p>
+        </div>
+        
+        <form action="/admin/students" method="GET" class="flex flex-wrap gap-4">
+            <select name="status" onchange="this.form.submit()" class="p-2 border rounded-xl bg-gray-50 text-xs font-bold text-green-800 outline-none">
+                <option value="all" {% if current_status == 'all' %}selected{% endif %}>Tüm Durumlar</option>
+                <option value="assigned" {% if current_status == 'assigned' %}selected{% endif %}>Atananlar</option>
+                <option value="unassigned" {% if current_status == 'unassigned' %}selected{% endif %}>Bekleyenler</option>
+            </select>
+            <select name="type" onchange="this.form.submit()" class="p-2 border rounded-xl bg-gray-50 text-xs font-bold text-blue-800 outline-none">
+                <option value="all" {% if current_type == 'all' %}selected{% endif %}>Tüm Öğretim</option>
+                <option value="Örgün" {% if current_type == 'Örgün' %}selected{% endif %}>Örgün</option>
+                <option value="Gece" {% if current_type == 'Gece' %}selected{% endif %}>Gece</option>
+            </select>
+            <input type="hidden" name="sort" value="{{ current_sort }}">
+        </form>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
+                    <th class="p-4 font-black">Numara</th>
+                    <th class="p-4 font-black">Ad Soyad</th>
+                    <th class="p-4 font-black">Öğretim</th>
+                    <th class="p-4 font-black">Grup Arkadaşı</th>
+                    <th class="p-4 font-black">Atandığı Konu</th>
+                    <th class="p-4 font-black cursor-pointer hover:bg-slate-700 transition" onclick="window.location.href='/admin/students?status={{current_status}}&type={{current_type}}&sort=week'">
+                        Hafta / Durum <i class="fa-solid fa-sort ml-1 text-green-400"></i>
+                    </th>
+                    <th class="p-4 font-black text-center">İşlem</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for s in students %}
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="p-4 font-mono text-sm font-bold text-blue-600 italic">
+                        <a href="/admin/student/{{ s.OgrenciNo }}" class="hover:underline">{{ s.OgrenciNo }}</a>
+                    </td>
+                    <td class="p-4 font-black text-gray-800">{{ s.AdSoyad if s.AdSoyad else '---' }}</td>
+                    <td class="p-4 text-xs font-bold text-gray-400 italic">{{ s.OgretimTuru }}</td>
+                    <td class="p-4 text-xs text-blue-500 font-bold">
+                        {% if s.GrupArkadasNo and s.GrupArkadasNo != '0' %}
+                            <a href="/admin/student/{{ s.GrupArkadasNo }}" class="hover:underline">
+                                <i class="fa-solid fa-link mr-1"></i> {{ s.GrupArkadasNo }}
+                            </a>
+                        {% else %}---{% endif %}
+                    </td>
+                    <td class="p-4 text-xs text-slate-600 font-bold max-w-[150px] truncate">
+                        {% if s.KonuAdi and s.SunumID %}
+                            <a href="/admin/panel?tur={{ s.SunumTuru }}#sunum-{{ s.SunumID }}" class="text-blue-600 hover:underline">{{ s.KonuAdi }}</a>
+                        {% else %}--{% endif %}
+                    </td>
+                    <td class="p-4">
+                        {% if s.HasSunum %}
+                            <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-black uppercase tracking-tighter">
+                                ✓ {{ s.HaftaNo }}. Hafta Sunumu
+                            </span>
+                        {% else %}
+                            <span class="px-3 py-1 rounded-full bg-orange-50 text-orange-400 text-[10px] font-black uppercase opacity-60 italic">Bekliyor</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4 text-center">
+                        {% if not s.IsApproved %}
+                            <form action="{{ url_for('admin.approve_student_account', student_id=s.OgrenciID) }}" method="POST" style="display:inline">
+                                <input type="hidden" name="redirect_to" value="admin_students">
+                                <button type="submit" class="text-[9px] bg-green-100 text-green-700 px-2 py-1 rounded font-black hover:bg-green-600 hover:text-white transition uppercase mr-2" title="Giriş onaylı ver">Onayla</button>
+                            </form>
+                        {% endif %}
+                        <form action="{{ url_for('admin.make_admin', student_id=s.OgrenciID) }}" method="POST" style="display:inline" onsubmit="return confirm('{{ s.OgrenciNo }} numaralı öğrenciyi admin yapmak istediğinize emin misiniz?')">
+                            <button type="submit" class="text-[9px] bg-blue-100 text-blue-600 px-2 py-1 rounded font-black hover:bg-blue-600 hover:text-white transition uppercase">Admin Yap</button>
+                        </form>
+                        <button onclick="showBolumModal('{{ s.OgrenciID }}', '{{ s.OgrenciNo }}')"
+                            class="text-[9px] bg-purple-100 text-purple-700 px-2 py-1 rounded font-black hover:bg-purple-600 hover:text-white transition uppercase ml-1">Bölüm</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Bölüm Değiştirme Modal -->
+<div id="bolum-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+        <h3 class="text-lg font-black text-gray-800 mb-1">Bölüm Değiştir</h3>
+        <p id="bolum-modal-info" class="text-xs text-gray-500 mb-4"></p>
+        <form action="/admin/student/bolum_degistir" method="POST">
+            <input type="hidden" name="ogrenci_id" id="modal-ogrenci-id">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-600 mb-1">Yeni Bölüm</label>
+                <select name="bolum_id" class="w-full border border-gray-300 rounded-xl p-2 text-sm font-bold outline-none focus:border-purple-400">
+                    {% for b in bolumler %}
+                    <option value="{{ b.BolumID }}">{{ b.BolumAdi }} ({{ b.OgretimTuru }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-xl font-black text-sm transition">Kaydet</button>
+                <button type="button" onclick="closeBolumModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-xl font-black text-sm transition">İptal</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    function showBolumModal(ogrenciId, ogrenciNo) {
+        document.getElementById('modal-ogrenci-id').value = ogrenciId;
+        document.getElementById('bolum-modal-info').textContent = 'Öğrenci No: ' + ogrenciNo;
+        document.getElementById('bolum-modal').classList.remove('hidden');
+    }
+    function closeBolumModal() {
+        document.getElementById('bolum-modal').classList.add('hidden');
+    }
+    document.getElementById('bolum-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeBolumModal();
+    });
+</script>
+{% endblock %}

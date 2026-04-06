@@ -1,0 +1,162 @@
+﻿{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    {# ===== BAŞLIK ===== #}
+    <div class="bg-white p-8 rounded-3xl shadow-xl border-b-8 border-emerald-600">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+                <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">{{ topic.HaftaNo }}. Hafta — {{ topic.OgretimTuru }}</p>
+                <h1 class="text-3xl font-black text-gray-800 tracking-tighter leading-tight">{{ topic.KonuAdi }}</h1>
+            </div>
+            <a href="/student/panel#sunum-{{ topic.SunumID }}" class="text-xs font-black text-gray-400 hover:text-gray-600 transition flex items-center gap-1.5 mt-1">
+                <i class="fa-solid fa-arrow-left"></i> Panele Dön
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {# ===== ATAMA DURUMU ===== #}
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+            <h2 class="text-xs font-black text-gray-400 uppercase mb-4 tracking-widest border-b border-gray-100 pb-2">
+                <i class="fa-solid fa-people-group mr-1 text-blue-400"></i>Sunum Yapacak Öğrenciler
+            </h2>
+            {% if atananlar %}
+                <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 mb-4">
+                    <p class="text-[10px] font-black text-emerald-600 uppercase mb-2">Onaylanan</p>
+                    {% for a in atananlar %}
+                    <a href="/student/profile/{{ a.OgrenciNo }}" class="flex items-center gap-2 hover:bg-emerald-100 p-2 rounded-lg transition group">
+                        <div class="w-7 h-7 bg-emerald-200 rounded-full flex items-center justify-center text-[10px] font-black text-emerald-700">
+                            {{ loop.index }}
+                        </div>
+                        <span class="font-black text-sm text-emerald-900 group-hover:underline">{{ a.OgrenciNo }}</span>
+                        {% if a.AdSoyad %}<span class="text-xs text-emerald-600 font-bold">{{ a.AdSoyad }}</span>{% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-4 text-center">
+                    <i class="fa-solid fa-hourglass-half text-amber-400 text-2xl mb-2"></i>
+                    <p class="text-amber-700 font-bold text-sm">Bu konuya henüz atama yapılmadı</p>
+                </div>
+            {% endif %}
+
+            {# Konu başvurusu butonu #}
+            {% if not my_topic_app and not atananlar %}
+            <form action="/student/apply_topic" method="POST">
+                <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
+                <div class="mb-3">
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Ortak Öğrenci No <span class="text-gray-300">(opsiyonel)</span></label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user-plus absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" name="ortak_no" placeholder="2021010002"
+                            oninput="lookupOrtakDetail(this.value)"
+                            class="w-full pl-9 pr-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 bg-gray-50 transition">
+                    </div>
+                    <p id="ortak-detail-name" class="mt-1 text-xs font-bold hidden"></p>
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow-md">
+                    <i class="fa-solid fa-bookmark mr-2"></i>Bu Konuya Başvur
+                </button>
+            </form>
+            {% elif my_topic_app %}
+            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center">
+                <i class="fa-solid fa-bookmark text-indigo-500 mr-1"></i>
+                <span class="text-indigo-700 font-black text-sm">Bu konuya başvurunuz mevcut</span>
+            </div>
+            {% endif %}
+        </div>
+
+        {# ===== SORU BAŞVURUSU ===== #}
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+            <div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+                <h2 class="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    <i class="fa-solid fa-comments mr-1 text-purple-400"></i>Soru Başvuruları
+                </h2>
+                <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-1 rounded-lg">
+                    {{ soru_soranlar|selectattr('IsApproved')|list|length }} Onaylı
+                </span>
+            </div>
+
+            {# Soru başvuru formu #}
+            {% if not my_question and not (my_assignment and my_assignment.SunumID == topic.SunumID) %}
+            <form action="/student/apply_question" method="POST" class="mb-5">
+                <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
+                <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-3">
+                    <p class="text-xs text-purple-700 font-bold">
+                        <i class="fa-solid fa-circle-info mr-1"></i>
+                        Bu sunuma soru soracağınızı kayıt altına alın. Hocalarınız derse katılımınızı takip edecek.
+                    </p>
+                </div>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow-md">
+                    <i class="fa-solid fa-question mr-2"></i>Soru Sormak İstiyorum (Kaydet)
+                </button>
+            </form>
+            {% elif my_question %}
+            <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center mb-4">
+                <i class="fa-solid fa-check-circle text-purple-500 mr-1"></i>
+                <span class="text-purple-700 font-black text-sm">Bu konuya soru hakkınızı kullandınız</span>
+            </div>
+            {% endif %}
+
+            {# Soru listesi #}
+            {% if soru_soranlar %}
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    {% for s in soru_soranlar %}
+                    <div class="flex flex-col p-3 rounded-xl border transition
+                        {% if s.IsApproved %}bg-emerald-50 border-emerald-200
+                        {% elif s.RejectReason %}bg-red-50 border-red-200
+                        {% else %}bg-gray-50 border-gray-200{% endif %}">
+                        <div class="flex items-center justify-between">
+                            <a href="/student/profile/{{ s.OgrenciNo }}" class="font-black text-sm hover:underline
+                                {% if s.IsApproved %}text-emerald-900{% elif s.RejectReason %}text-red-700 line-through opacity-60{% else %}text-gray-700{% endif %}">
+                                {{ s.OgrenciNo }}{% if s.AdSoyad %} — {{ s.AdSoyad }}{% endif %}
+                            </a>
+                            {% if s.IsApproved %}
+                                <span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase"><i class="fa-solid fa-check"></i></span>
+                            {% elif s.RejectReason %}
+                                <span class="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase"><i class="fa-solid fa-xmark"></i></span>
+                            {% else %}
+                                <span class="bg-gray-400 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase"><i class="fa-solid fa-clock"></i></span>
+                            {% endif %}
+                        </div>
+                        {% if s.RejectReason %}
+                        <p class="text-[10px] text-red-500 font-bold mt-1">{{ s.RejectReason }}</p>
+                        {% endif %}
+                        <span class="text-[10px] font-mono text-gray-400 mt-1">
+                            {{ s.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if s.ZamanDamgasi else '--' }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-300 italic font-bold text-sm text-center py-6">Henüz soru başvurusu yok.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+let ortakDetailTimeout;
+function lookupOrtakDetail(val) {
+    clearTimeout(ortakDetailTimeout);
+    const nameEl = document.getElementById('ortak-detail-name');
+    if (val.length < 7) { nameEl.classList.add('hidden'); return; }
+    ortakDetailTimeout = setTimeout(() => {
+        fetch('/api/student_lookup?no=' + encodeURIComponent(val))
+            .then(r => r.json())
+            .then(data => {
+                if (data.found) {
+                    nameEl.textContent = '✓ ' + (data.ad_soyad || val);
+                    nameEl.className = 'mt-1 text-xs font-bold text-emerald-600';
+                } else {
+                    nameEl.textContent = '✗ Öğrenci bulunamadı';
+                    nameEl.className = 'mt-1 text-xs font-bold text-red-500';
+                }
+                nameEl.classList.remove('hidden');
+            });
+    }, 400);
+}
+</script>
+{% endblock %}

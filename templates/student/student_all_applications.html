@@ -1,0 +1,116 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex flex-col md:flex-row justify-between items-start bg-white p-6 rounded-2xl shadow-lg border-b-4 border-indigo-600 gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Konu Başvurularım</h1>
+            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Başvurduğunuz konuları buradan takip edebilir ve iptal edebilirsiniz.</p>
+        </div>
+        <a href="/student/panel" class="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-xl font-black text-xs transition">
+            <i class="fa-solid fa-plus"></i> Yeni Başvuru Yap
+        </a>
+    </div>
+
+    {% if applications %}
+    <div class="space-y-4">
+        {% for app in applications %}
+        {% set is_approved = app.IsApproved %}
+        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden
+                    {% if is_approved %}border-emerald-300{% else %}border-gray-100{% endif %}">
+            <!-- Kart başlık -->
+            <div class="p-4 flex items-start gap-4 {% if is_approved %}bg-emerald-50{% endif %}">
+                <div class="w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center font-black text-lg
+                            {% if is_approved %}bg-emerald-500 text-white{% else %}bg-indigo-100 text-indigo-700{% endif %}">
+                    {{ app.HaftaNo }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                        <a href="/student/topic/{{ app.SunumID }}" class="font-black text-gray-800 hover:text-indigo-600 transition text-sm leading-tight">
+                            {{ app.KonuAdi }}
+                        </a>
+                        {% if is_approved %}
+                        <span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wide">
+                            <i class="fa-solid fa-check mr-0.5"></i> Onaylandı
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="text-[10px] text-gray-400 font-bold">
+                        {{ app.HaftaNo }}. Hafta &bull;
+                        {% set partner_no = app.Ogrenci2No if app.Ogrenci1No == session.student_no else app.Ogrenci1No %}
+                        {% if partner_no and partner_no != '0' %}
+                            <span class="text-blue-500">Ortak: {{ partner_no }}</span>
+                        {% else %}
+                            Bireysel
+                        {% endif %}
+                        &bull; {{ app.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if app.ZamanDamgasi else '' }}
+                    </p>
+                </div>
+                <div class="flex-shrink-0 flex items-center gap-2">
+                    <span class="bg-indigo-100 text-indigo-700 text-xs font-black px-2.5 py-1 rounded-full">
+                        {{ app.OncelikSirasi }}. Tercih
+                    </span>
+                    {% if not is_approved %}
+                    <form action="/student/delete_application/{{ app.BasvuruID }}" method="POST"
+                        onsubmit="return confirm('Bu başvuruyu iptal etmek istediğinizden emin misiniz?')">
+                        <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-500 text-[10px] font-black px-2.5 py-1.5 rounded-lg transition border border-red-100">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="px-4 pb-4">
+                <div class="flex items-center gap-0 mt-2">
+                    <!-- Adım 1: Başvuruldu -->
+                    <div class="flex flex-col items-center flex-1">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center bg-indigo-600 text-white text-xs font-black z-10">
+                            <i class="fa-solid fa-file-pen text-[10px]"></i>
+                        </div>
+                        <p class="text-[9px] font-black text-indigo-600 mt-1 text-center uppercase">Başvuruldu</p>
+                    </div>
+                    <div class="flex-1 h-1 {% if is_approved %}bg-emerald-400{% else %}bg-gray-200{% endif %} mx-1 mb-4 rounded"></div>
+
+                    <!-- Adım 2: İnceleniyor / Onaylandı -->
+                    <div class="flex flex-col items-center flex-1">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black z-10
+                                    {% if is_approved %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}">
+                            <i class="fa-solid {% if is_approved %}fa-check{% else %}fa-hourglass-half{% endif %} text-[10px]"></i>
+                        </div>
+                        <p class="text-[9px] font-black mt-1 text-center uppercase
+                                  {% if is_approved %}text-emerald-600{% else %}text-gray-400{% endif %}">
+                            {% if is_approved %}Onaylandı{% else %}Bekleniyor{% endif %}
+                        </p>
+                    </div>
+                    <div class="flex-1 h-1 {% if is_approved %}bg-emerald-400{% else %}bg-gray-200{% endif %} mx-1 mb-4 rounded"></div>
+
+                    <!-- Adım 3: Sunum Günü -->
+                    <div class="flex flex-col items-center flex-1">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black z-10
+                                    {% if is_approved %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-400{% endif %}">
+                            <i class="fa-solid fa-chalkboard-user text-[10px]"></i>
+                        </div>
+                        <p class="text-[9px] font-black mt-1 text-center uppercase
+                                  {% if is_approved %}text-blue-600{% else %}text-gray-400{% endif %}">
+                            {{ app.HaftaNo }}. Hafta Sunumu
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-3xl shadow-xl p-16 text-center border border-gray-100">
+        <i class="fa-solid fa-inbox text-5xl text-gray-200 mb-4"></i>
+        <p class="text-gray-400 font-black text-lg">Henüz konu başvurusu yapmadınız</p>
+        <p class="text-gray-300 text-sm mt-1 mb-6">Sunum panelinden başvurmak istediğiniz konuyu seçin</p>
+        <a href="/student/panel" class="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-indigo-700 transition">
+            <i class="fa-solid fa-magnifying-glass"></i> Konulara Göz At
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

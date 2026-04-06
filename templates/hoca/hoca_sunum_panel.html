@@ -1,0 +1,292 @@
+﻿{% extends "shared/layout.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-4">
+
+    {# ===== BÖLÜM SEÇİCİ TABS ===== #}
+    <div class="bg-white p-5 rounded-2xl shadow-lg border-b-4 border-purple-600">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Sunum Paneli</h1>
+                {% if secili_bolum %}
+                <p class="text-xs text-gray-500 font-medium mt-1">
+                    {{ secili_bolum.BolumAdi }}
+                    <span class="inline-block ml-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase
+                        {% if secili_bolum.OgretimTuru == 'Örgün' %}bg-blue-100 text-blue-700{% else %}bg-purple-100 text-purple-700{% endif %}">
+                        {{ secili_bolum.OgretimTuru }}
+                    </span>
+                    <span class="inline-block ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-gray-100 text-gray-600">
+                        {{ secili_bolum.DonemAdi }}
+                    </span>
+                </p>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('hoca.hoca_panel') }}"
+               class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition">
+                <i class="fa-solid fa-arrow-left"></i> Genel Bakış
+            </a>
+        </div>
+
+        {# Bölüm tab'ları #}
+        {% if bolumler %}
+        <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+            {% for b in bolumler %}
+            <a href="{{ url_for('hoca.hoca_sunum_panel', bolum_id=b.BolumID) }}"
+               class="px-4 py-2 rounded-xl font-black text-xs transition border-2
+                      {% if secili_bolum_id == b.BolumID|string %}
+                          {% if b.OgretimTuru == 'Örgün' %}bg-blue-600 border-blue-600 text-white{% else %}bg-purple-600 border-purple-600 text-white{% endif %}
+                      {% else %}
+                          bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-400
+                      {% endif %}">
+                {{ b.BolumAdi }}
+                <span class="ml-1 opacity-70 font-medium">· {{ b.OgretimTuru }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {# ===== FLASH MESAJLARI ===== #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash-message p-4 rounded-xl font-bold text-sm border
+            {% if cat == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+            <i class="fa-solid {% if cat == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-2"></i>{{ msg }}
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if not secili_bolum %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <i class="fa-solid fa-building-columns text-gray-300 text-5xl mb-4"></i>
+        <p class="font-black text-gray-400 text-lg">Henüz bölüm yok</p>
+        <p class="text-gray-400 text-sm mt-1">Genel Bakış panelinden bölüm oluşturun.</p>
+        <a href="{{ url_for('hoca.hoca_panel') }}" class="inline-flex items-center gap-2 mt-6 bg-purple-600 text-white px-5 py-2.5 rounded-xl font-black text-sm transition hover:bg-purple-700">
+            <i class="fa-solid fa-arrow-left"></i> Panele Dön
+        </a>
+    </div>
+
+    {% else %}
+
+    {# ===== İSTATİSTİK KARTLARI ===== #}
+    {% set total = schedule_data | length %}
+    {% set onaylanan = schedule_data | selectattr('Onaylanan') | list | length %}
+    {% set bekleyen = total - onaylanan %}
+    {% set basvuru_olan = schedule_data | selectattr('Basvurular') | list | length %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-blue-500 flex items-center gap-4">
+            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-calendar-days text-blue-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Toplam Slot</p>
+                <p class="text-2xl font-black text-gray-800">{{ total }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-emerald-500 flex items-center gap-4">
+            <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Onaylanan</p>
+                <p class="text-2xl font-black text-emerald-600">{{ onaylanan }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-orange-400 flex items-center gap-4">
+            <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-hourglass-half text-orange-500 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Bekleyen</p>
+                <p class="text-2xl font-black text-orange-500">{{ bekleyen }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-4 border-l-4 border-purple-500 flex items-center gap-4">
+            <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-file-pen text-purple-500 text-sm"></i>
+            </div>
+            <div>
+                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Başvurulu</p>
+                <p class="text-2xl font-black text-purple-600">{{ basvuru_olan }}</p>
+            </div>
+        </div>
+    </div>
+
+    {# ===== TOPLU İŞLEM BUTONLARI ===== #}
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div class="flex flex-wrap gap-3">
+            <form action="/admin/auto_assign" method="POST">
+                <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
+                <button type="submit"
+                    onclick="return confirm('Onaylanmamış tüm konular otomatik olarak en yüksek tercih sırasına göre atanacak. Devam edilsin mi?')"
+                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Hepsini Otomatik Onayla
+                </button>
+            </form>
+            <form action="/admin/clear_all" method="POST">
+                <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
+                <button type="submit"
+                    onclick="return confirm('{{ secili_bolum.OgretimTuru }} türündeki TÜM onaylar kaldırılacak. Bu işlem geri alınamaz. Emin misiniz?')"
+                    class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                    <i class="fa-solid fa-trash-can"></i> Tüm Onayları Kaldır
+                </button>
+            </form>
+            <a href="/hoca/export/excel?bolum_id={{ secili_bolum.BolumID }}"
+                class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                <i class="fa-solid fa-file-excel"></i> Excel İndir
+            </a>
+            <a href="/hoca/export/pdf?bolum_id={{ secili_bolum.BolumID }}"
+                class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-black text-xs transition shadow-sm">
+                <i class="fa-solid fa-file-pdf"></i> PDF İndir
+            </a>
+        </div>
+    </div>
+
+    {# ===== SUNUM SLOTLARI ===== #}
+    {% if schedule_data %}
+    {% set ns = namespace(last_week=0) %}
+    {% for sunum in schedule_data %}
+    {% if sunum.HaftaNo != ns.last_week %}
+    <div class="bg-slate-800 text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3">
+        {{ sunum.HaftaNo }}. HAFTA
+        {% if sunum.SunumTarihi %}
+        <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
+        {% endif %}
+    </div>
+    {% set ns.last_week = sunum.HaftaNo %}
+    {% endif %}
+
+    <div id="sunum-{{ sunum.SunumID }}" class="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 transition
+                    {% if sunum.Onaylanan %}border-emerald-400{% else %}border-gray-200{% endif %}">
+
+        <div class="p-4 flex items-center gap-4">
+
+            {# Konu adı #}
+            <div class="w-[220px] flex-shrink-0 cursor-pointer group"
+                onclick="toggleDetails('detay-{{ sunum.SunumID }}')">
+                {% if sunum.Onaylanan %}
+                <span class="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded mb-1 inline-block uppercase tracking-wider">✓ Onaylandı</span>
+                {% else %}
+                <span class="text-[8px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded mb-1 inline-block uppercase tracking-wider">Bekliyor</span>
+                {% endif %}
+                <h3 class="font-extrabold text-gray-800 text-sm group-hover:text-blue-600 transition leading-tight">{{ sunum.KonuAdi }}</h3>
+            </div>
+
+            {# Başvuru dropdown + işlem butonları #}
+            <div class="flex-1 min-w-0">
+                {% if sunum.Onaylanan %}
+                <div class="flex items-center gap-2">
+                    <select disabled
+                        class="flex-1 min-w-0 p-2 border-2 border-gray-200 rounded-xl text-xs font-bold bg-gray-50 text-gray-700 outline-none cursor-default">
+                        {% for b in sunum.Basvurular %}
+                        <option value="{{ b.BasvuruID }}" {% if b.IsApproved %}selected{% endif %}>
+                            {% if b.IsApproved %}✓ {% endif %}{{ b.OncelikSirasi }}. Tercih: {{ b.Ogr1Label }}{% if b.Ogr2Label %} &amp; {{ b.Ogr2Label }}{% else %} (Bireysel){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <form action="/admin/clear_assignment" method="POST" class="flex-shrink-0">
+                        <input type="hidden" name="sunum_id" value="{{ sunum.SunumID }}">
+                        <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
+                        <button type="submit" onclick="return confirm('Bu konunun onayı kaldırılsın mı?')"
+                            class="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs transition whitespace-nowrap shadow-sm">
+                            <i class="fa-solid fa-rotate-left text-[10px]"></i> Onayı Kaldır
+                        </button>
+                    </form>
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                    {% for a in sunum.Atananlar %}
+                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                        {{ a.OgrenciNo }}{% if a.AdSoyad and a.AdSoyad != 'None' %} ({{ a.AdSoyad }}){% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+
+                {% elif sunum.Basvurular %}
+                <form action="/admin/assign" method="POST" class="flex items-center gap-2">
+                    <input type="hidden" name="sunum_id" value="{{ sunum.SunumID }}">
+                    <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
+                    <select name="basvuru_id"
+                        class="flex-1 min-w-0 p-2 border-2 border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none focus:border-blue-400 transition">
+                        {% for b in sunum.Basvurular %}
+                        <option value="{{ b.BasvuruID }}">
+                            {{ b.OncelikSirasi }}. Tercih: {{ b.Ogr1Label }}{% if b.Ogr2Label %} &amp; {{ b.Ogr2Label }}{% else %} (Bireysel){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit"
+                        class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-black text-xs transition whitespace-nowrap shadow-sm flex-shrink-0">
+                        <i class="fa-solid fa-check text-[10px]"></i> Onayla
+                    </button>
+                </form>
+
+                {% else %}
+                <span class="text-xs text-gray-400 italic font-bold">Henüz başvuru yok</span>
+                {% endif %}
+            </div>
+
+        </div>
+
+        {# Başvuru detayları #}
+        <div id="detay-{{ sunum.SunumID }}" class="hidden border-t border-gray-100 bg-slate-50 p-5">
+            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tüm Başvurular</p>
+            {% if sunum.Basvurular %}
+            <div class="space-y-2">
+                {% for b in sunum.Basvurular %}
+                <div class="flex items-center justify-between p-3 rounded-xl border text-sm
+                            {% if b.IsApproved %}bg-emerald-50 border-emerald-200{% else %}bg-white border-slate-200{% endif %}">
+                    <span class="font-bold {% if b.IsApproved %}text-emerald-800{% else %}text-slate-700{% endif %}">
+                        {% if b.IsApproved %}<i class="fa-solid fa-check text-emerald-500 mr-1"></i>{% endif %}
+                        {{ b.OncelikSirasi }}-
+                        <a href="/admin/student/{{ b.Ogrenci1No }}" class="text-blue-600 hover:underline">{{ b.Ogr1Label }}</a>
+                        {% if b.Ogr2Label %} / <a href="/admin/student/{{ b.Ogrenci2No }}" class="text-blue-600 hover:underline">{{ b.Ogr2Label }}</a>{% endif %}
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-400 italic">
+                        {{ b.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if b.ZamanDamgasi else '--' }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400 italic">Bu konuya henüz başvuru yapılmamış.</p>
+            {% endif %}
+
+            <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                <a href="/admin/topic/{{ sunum.SunumID }}"
+                   class="inline-flex items-center gap-2 bg-blue-100 text-blue-800 hover:bg-blue-200 px-4 py-2 rounded-xl font-black text-xs transition">
+                    <i class="fa-solid fa-users-viewfinder"></i> Sorular ({{ sunum.SoruSayisi }}) ve soru soracak öğrencileri gör
+                </a>
+            </div>
+        </div>
+
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <i class="fa-solid fa-calendar-xmark text-gray-300 text-5xl mb-4"></i>
+        <p class="font-black text-gray-400 text-lg">Bu bölümde sunum slotu yok</p>
+        <p class="text-gray-400 text-sm mt-1">Slotlar bölüm kurulumu sırasında atanır.</p>
+    </div>
+    {% endif %}
+
+    {% endif %}{# end secili_bolum #}
+
+</div>
+<script>
+    function toggleDetails(id) {
+        document.getElementById(id).classList.toggle('hidden');
+    }
+    window.addEventListener('load', function () {
+        if (window.location.hash) {
+            const el = document.querySelector(window.location.hash);
+            if (el) {
+                setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2');
+                    setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2'), 2500);
+                }, 100);
+            }
+        }
+    });
+</script>
+{% endblock %}
