@@ -331,6 +331,39 @@ def hoca_donem_ekle():
 
 # --- Öğrenci Listesi & Ekleme & Import ---
 
+@hoca_bp.route('/ogrenciler')
+@hoca_required
+def hoca_tum_ogrenciler():
+    bolum_id = request.args.get('bolum_id')
+    if bolum_id and bolum_id.isdigit():
+        return redirect(url_for('hoca.hoca_ogrenci_listesi', bolum_id=int(bolum_id)))
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if session.get('user_role') == 'hoca':
+        cursor.execute("""
+            SELECT b.BolumID
+            FROM HocaBolumler hb
+            JOIN Bolumler b ON hb.BolumID = b.BolumID
+            JOIN Donemler d ON b.DonemID = d.DonemID
+            WHERE hb.HocaID = %s
+            ORDER BY d.Aktif DESC, d.DonemAdi DESC, b.BolumAdi
+            LIMIT 1
+        """, (session['hoca_id'],))
+    else:
+        cursor.execute("""
+            SELECT b.BolumID
+            FROM Bolumler b JOIN Donemler d ON b.DonemID = d.DonemID
+            ORDER BY d.Aktif DESC, d.DonemAdi DESC, b.BolumAdi
+            LIMIT 1
+        """)
+    bolum = cursor.fetchone()
+    if not bolum:
+        flash("Henüz bir bölümünüz bulunmuyor.", "error")
+        return redirect(url_for('hoca.hoca_panel'))
+    return redirect(url_for('hoca.hoca_ogrenci_listesi', bolum_id=bolum.BolumID))
+
+
 @hoca_bp.route('/bolum/<int:bolum_id>/ogrenciler')
 @hoca_required
 def hoca_ogrenci_listesi(bolum_id):
@@ -343,12 +376,30 @@ def hoca_ogrenci_listesi(bolum_id):
         WHERE b.BolumID=%s
     """, (bolum_id,))
     bolum = cursor.fetchone()
+    
+    if session.get('user_role') == 'hoca':
+        cursor.execute("""
+            SELECT b.BolumID, b.BolumAdi, b.OgretimTuru, d.DonemAdi, d.DonemID, d.Aktif
+            FROM HocaBolumler hb
+            JOIN Bolumler b ON hb.BolumID = b.BolumID
+            JOIN Donemler d ON b.DonemID = d.DonemID
+            WHERE hb.HocaID = %s
+            ORDER BY d.Aktif DESC, d.DonemAdi DESC, b.BolumAdi
+        """, (session['hoca_id'],))
+    else:
+        cursor.execute("""
+            SELECT b.BolumID, b.BolumAdi, b.OgretimTuru, d.DonemAdi, d.DonemID, d.Aktif
+            FROM Bolumler b JOIN Donemler d ON b.DonemID = d.DonemID
+            ORDER BY d.Aktif DESC, d.DonemAdi DESC, b.BolumAdi
+        """)
+    bolumler = cursor.fetchall()
+    
     cursor.execute("""
         SELECT OgrenciID, OgrenciNo, AdSoyad, IsApproved, KayitTarihi
         FROM Ogrenciler WHERE BolumID=%s ORDER BY OgrenciNo
     """, (bolum_id,))
     ogrenciler = cursor.fetchall()
-    return render_template('hoca/hoca_ogrenci_listesi.html', bolum=bolum, ogrenciler=ogrenciler)
+    return render_template('hoca/hoca_ogrenci_listesi.html', bolum=bolum, ogrenciler=ogrenciler, bolumler=bolumler, secili_bolum_id=str(bolum_id))
 
 
 @hoca_bp.route('/bolum/<int:bolum_id>/ogrenci_ekle', methods=['POST'])

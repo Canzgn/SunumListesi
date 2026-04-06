@@ -129,8 +129,8 @@
                 <a href="/admin/manage_admins" class="nav-link flex items-center p-3 text-amber-700 rounded-xl transition font-bold text-sm {% if request.path == '/admin/manage_admins' %}active{% endif %}">
                     <i class="fa-solid fa-user-shield w-6 text-center mr-2"></i> Admin Yönetimi
                 </a>
-                <a href="/student/duyurular" class="nav-link flex items-center p-3 text-yellow-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/duyurular' %}active{% endif %}">
-                    <i class="fa-solid fa-bullhorn w-6 text-center mr-2"></i> Duyurular
+                <a href="/hoca/ogrenciler?bolum_id={{ request.args.get('bolum_id', '') }}" class="nav-link flex items-center p-3 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/bolum/') and 'ogrenciler' in request.path %}active{% endif %}">
+                    <i class="fa-solid fa-users w-6 text-center mr-2"></i> Mevcut Öğrenciler
                 </a>
                 <a href="/hoca/bolum_ekle" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/bolum_ekle' %}active{% endif %}">
                     <i class="fa-solid fa-plus-circle w-6 text-center mr-2"></i> Yeni Bölüm Ekle

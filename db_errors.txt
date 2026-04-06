@@ -1,0 +1,15 @@
+﻿
+  SET
+  SET
+> 2026-04-06 17:46:05.163 UTC [54] ERROR:  s
+chema "public" already exists
+  2026-04-06 17:46:05.163 UTC [54] STATEMENT
+:  CREATE SCHEMA public;
+> psql:/docker-entrypoint-initdb.d/01_schema
+.sql:26: ERROR:  schema "public" already exi
+sts
+  
+  PostgreSQL Database directory appears to c
+ontain a database; Skipping initialization
+
+
