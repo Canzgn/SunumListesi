@@ -1,0 +1,51 @@
+{# ===== Yüklenen Sunum Dosyaları Partial =====
+   Beklenen değişkenler:
+     dosyalar     : list of {DosyaID, DosyaTipi, DosyaAdi, DosyaBoyutu,
+                              YuklemeTarihi, Aciklama, YukleyenNo, YukleyenAd}
+     compact      : (opsiyonel, default False) — daha sıkı görünüm
+================================================ #}
+{% set _compact = compact|default(false) %}
+<div class="bg-white rounded-xl border border-gray-200 p-3">
+    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center justify-between">
+        <span><i class="fa-solid fa-folder-open text-blue-400 mr-1"></i>Yüklenen Dosyalar</span>
+        <span class="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded">{{ dosyalar|length }}</span>
+    </p>
+    {% if dosyalar %}
+    <div class="space-y-1.5">
+        {% for d in dosyalar %}
+        {% if d.DosyaTipi == 'sunum' %}
+            {% set tip_cls = 'bg-blue-100 text-blue-700' %}
+        {% elif d.DosyaTipi == 'demo' %}
+            {% set tip_cls = 'bg-purple-100 text-purple-700' %}
+        {% elif d.DosyaTipi == 'kaynak' %}
+            {% set tip_cls = 'bg-amber-100 text-amber-700' %}
+        {% else %}
+            {% set tip_cls = 'bg-gray-100 text-gray-700' %}
+        {% endif %}
+        <div class="flex items-center justify-between gap-2 p-2 rounded-lg border border-gray-100 bg-slate-50 hover:bg-white transition">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded {{ tip_cls }}">{{ d.DosyaTipi }}</span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-xs font-black text-gray-800 truncate">{{ d.DosyaAdi }}</p>
+                    {% if not _compact %}
+                    <p class="text-[10px] text-gray-400 font-bold flex flex-wrap gap-2">
+                        {% if d.YuklemeTarihi %}<span><i class="fa-regular fa-clock"></i> {{ d.YuklemeTarihi.strftime('%d.%m.%Y %H:%M') }}</span>{% endif %}
+                        {% if d.DosyaBoyutu %}<span>{{ (d.DosyaBoyutu / 1024 / 1024) | round(2) }} MB</span>{% endif %}
+                        {% if d.YukleyenNo %}<span><i class="fa-solid fa-user"></i> {{ d.YukleyenNo }}{% if d.YukleyenAd %} — {{ d.YukleyenAd }}{% endif %}</span>{% endif %}
+                    </p>
+                    {% if d.Aciklama %}<p class="text-[10px] text-gray-500 italic mt-0.5">{{ d.Aciklama }}</p>{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('student.student_sunum_dosya_indir', dosya_id=d.DosyaID) }}"
+               class="shrink-0 bg-blue-100 hover:bg-blue-600 hover:text-white text-blue-700 text-xs font-black px-2.5 py-1.5 rounded-lg transition"
+               title="İndir / Görüntüle">
+                <i class="fa-solid fa-download"></i>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-[11px] text-gray-300 italic font-bold text-center py-3">Bu sunum için henüz dosya yüklenmedi.</p>
+    {% endif %}
+</div>

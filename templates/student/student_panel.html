@@ -172,35 +172,44 @@
                     <i class="fa-solid fa-check mr-1"></i>Soru Hakkı
                 </span>
                 {% endif %}
-                {# Kaç soru sorulmuş #}
-                <span class="text-[9px] font-black text-gray-400 text-center">
-                    <i class="fa-solid fa-comment text-gray-300 mr-0.5"></i>{{ sunum.SoruSayisi }} soru
+                {# Kaç soru tam onaylı / toplam #}
+                <span class="text-[9px] font-black text-gray-400 text-center" title="Tam onay (sunan + hakem) / toplam başvuru">
+                    <i class="fa-solid fa-comment text-gray-300 mr-0.5"></i>{{ sunum.SoruOzet.tam_onayli }} / {{ sunum.SoruOzet.toplam }} soru
                 </span>
             </div>
         </div>
 
         {# Başvuru detayları (expandable) #}
         <div id="detay-{{ sunum.SunumID }}" class="hidden border-t border-gray-100 bg-slate-50 p-5">
-            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tüm Başvurular</p>
-            <div class="space-y-2">
-                {% for b in sunum.Basvurular %}
-                <div class="flex items-center justify-between p-3 rounded-xl border text-sm
-                            {% if b.IsApproved %}bg-emerald-50 border-emerald-200
-                            {% elif b.Ogrenci1No == session.student_no or b.Ogrenci2No == session.student_no %}bg-indigo-50 border-indigo-200
-                            {% else %}bg-white border-slate-200{% endif %}">
-                    <span class="font-bold {% if b.IsApproved %}text-emerald-800{% else %}text-slate-700{% endif %}">
-                        {% if b.IsApproved %}<i class="fa-solid fa-check text-emerald-500 mr-1"></i>{% endif %}
-                        {% if b.Ogrenci1No == session.student_no or b.Ogrenci2No == session.student_no %}<i class="fa-solid fa-user text-indigo-500 mr-1"></i>{% endif %}
-                        {{ b.OncelikSirasi }}. — {{ b.Ogr1Label }}{% if b.Ogr2Label %} / {{ b.Ogr2Label }}{% endif %}
-                    </span>
-                    <span class="text-[10px] font-mono text-slate-400 italic">
-                        {{ b.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if b.ZamanDamgasi else '--' }}
-                    </span>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tüm Başvurular</p>
+                    <div class="space-y-2">
+                        {% for b in sunum.Basvurular %}
+                        <div class="flex items-center justify-between p-3 rounded-xl border text-sm
+                                    {% if b.IsApproved %}bg-emerald-50 border-emerald-200
+                                    {% elif b.Ogrenci1No == session.student_no or b.Ogrenci2No == session.student_no %}bg-indigo-50 border-indigo-200
+                                    {% else %}bg-white border-slate-200{% endif %}">
+                            <span class="font-bold {% if b.IsApproved %}text-emerald-800{% else %}text-slate-700{% endif %}">
+                                {% if b.IsApproved %}<i class="fa-solid fa-check text-emerald-500 mr-1"></i>{% endif %}
+                                {% if b.Ogrenci1No == session.student_no or b.Ogrenci2No == session.student_no %}<i class="fa-solid fa-user text-indigo-500 mr-1"></i>{% endif %}
+                                {{ b.OncelikSirasi }}. — {{ b.Ogr1Label }}{% if b.Ogr2Label %} / {{ b.Ogr2Label }}{% endif %}
+                            </span>
+                            <span class="text-[10px] font-mono text-slate-400 italic">
+                                {{ b.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if b.ZamanDamgasi else '--' }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                        {% if not sunum.Basvurular %}
+                        <p class="text-center text-gray-400 italic text-xs py-4">Henüz başvuru yok — İlk siz olun!</p>
+                        {% endif %}
+                    </div>
                 </div>
-                {% endfor %}
-                {% if not sunum.Basvurular %}
-                <p class="text-center text-gray-400 italic text-xs py-4">Henüz başvuru yok — İlk siz olun!</p>
-                {% endif %}
+                <div>
+                    {% with dosyalar = sunum.Dosyalar %}
+                    {% include 'shared/_sunum_dosyalari.html' %}
+                    {% endwith %}
+                </div>
             </div>
             <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end">
                 <a href="/student/topic/{{ sunum.SunumID }}" class="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-4 py-2 rounded-xl font-black text-xs transition">

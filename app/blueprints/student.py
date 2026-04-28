@@ -10,7 +10,7 @@ import os
 import uuid
 
 from db_manager import get_db_connection
-from app.decorators import student_required
+from app.decorators import student_required, login_required
 from app.utils import allowed_file, basvuru_acik_mi
 from app.helpers import build_schedule_data
 
@@ -574,9 +574,10 @@ def student_sunum_dosya_sil(dosya_id):
 
 
 @student_bp.route('/sunum/dosya/<int:dosya_id>/indir')
-@student_required
+@login_required
 def student_sunum_dosya_indir(dosya_id):
-    """Auth check sonrası dosyayı indirir (local: stream, supabase: signed URL'e redirect)."""
+    """Auth check sonrası dosyayı indirir (local: stream, supabase: signed URL'e redirect).
+    Tüm girilmiş rollerden erişilebilir (öğrenci, hoca, admin, kontrolcü)."""
     from app.services.storage import get_storage, StorageError
     conn = get_db_connection()
     cursor = conn.cursor()

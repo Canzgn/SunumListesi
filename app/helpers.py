@@ -41,14 +41,39 @@ def build_schedule_data(slot_ids, slots):
     for row in cursor.fetchall():
         basvurular_map.setdefault(row.SunumID, []).append(row)
 
-    # Soru sayıları
+    # Soru sayıları — toplam + sunum sahibi onaylı + kontrolcü onaylı + tam onaylı
     cursor.execute("""
-        SELECT SunumID, COUNT(*) AS sayi
+        SELECT SunumID,
+               COUNT(*) AS toplam,
+               COUNT(*) FILTER (WHERE SunanOnayi = TRUE) AS sunan_onayli,
+               COUNT(*) FILTER (WHERE IsApproved = TRUE) AS hakem_onayli,
+               COUNT(*) FILTER (WHERE IsApproved = TRUE AND SunanOnayi = TRUE) AS tam_onayli
         FROM SoruBasvurulari
         WHERE SunumID = ANY(%s)
         GROUP BY SunumID
     """, (slot_ids,))
-    soru_map = {row.SunumID: row.sayi for row in cursor.fetchall()}
+    soru_map = {}
+    for row in cursor.fetchall():
+        soru_map[row.SunumID] = {
+            'toplam': row.toplam,
+            'sunan_onayli': row.sunan_onayli,
+            'hakem_onayli': row.hakem_onayli,
+            'tam_onayli': row.tam_onayli,
+        }
+
+    # Yüklenen dosyalar (sunum/demo/kaynak)
+    cursor.execute("""
+        SELECT d.SunumID, d.DosyaID, d.DosyaTipi, d.DosyaAdi, d.DosyaBoyutu,
+               d.YuklemeTarihi, d.Aciklama,
+               o.OgrenciNo AS YukleyenNo, o.AdSoyad AS YukleyenAd
+        FROM SunumDosyalari d
+        LEFT JOIN Ogrenciler o ON o.OgrenciID = d.YukleyenOgrenciID
+        WHERE d.SunumID = ANY(%s)
+        ORDER BY d.SunumID, d.YuklemeTarihi DESC
+    """, (slot_ids,))
+    dosya_map = {}
+    for row in cursor.fetchall():
+        dosya_map.setdefault(row.SunumID, []).append(row)
 
     # Birleştir
     schedule_data = []
@@ -86,7 +111,9 @@ def build_schedule_data(slot_ids, slots):
             'Atananlar': atananlar,
             'Onaylanan': len(atananlar) > 0,
             'OnaylananBasvuruID': onaylanan_basvuru_id,
-            'SoruSayisi': soru_map.get(s.SunumID, 0)
+            'SoruSayisi': soru_map.get(s.SunumID, {}).get('toplam', 0),
+            'SoruOzet': soru_map.get(s.SunumID, {'toplam': 0, 'sunan_onayli': 0, 'hakem_onayli': 0, 'tam_onayli': 0}),
+            'Dosyalar': dosya_map.get(s.SunumID, []),
         })
 
     return schedule_data
