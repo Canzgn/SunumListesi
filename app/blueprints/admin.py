@@ -475,10 +475,14 @@ def admin_assign():
 @admin_bp.route('/questions')
 @admin_required
 def admin_questions():
-    sort_order = request.args.get('sort', 'desc')
+    sort_order = request.args.get('sort', 'konu')
     tur_filter = request.args.get('tur', '')
     hafta_filter = request.args.get('hafta', '')
     order_sql = "ASC" if sort_order == 'asc' else "DESC"
+    if sort_order == 'konu':
+        order_clause = "sp.HaftaNo ASC, k.KonuAdi ASC, sb.ZamanDamgasi DESC"
+    else:
+        order_clause = f"sb.ZamanDamgasi {order_sql}"
 
     admin_bolum_ids = get_admin_bolum_ids()
     conn = get_db_connection()
@@ -513,7 +517,7 @@ def admin_questions():
         JOIN Konular k ON sp.KonuID = k.KonuID
         LEFT JOIN Ogrenciler o ON sb.OgrenciNo = o.OgrenciNo
         WHERE 1=1 {bolum_filter} {tur_sql} {hafta_sql}
-        ORDER BY sb.ZamanDamgasi {order_sql}
+        ORDER BY {order_clause}
     """, params if params else None)
     applications = cursor.fetchall()
 

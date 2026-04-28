@@ -40,15 +40,17 @@
 
     {# ÖZET SAYAÇLAR #}
     {% if grouped %}
-    {% set toplam_kayit = grouped.values() | sum(attribute='kayitlar') | list | length %}
     {% set onayli = [] %}
     {% set bekleyen = [] %}
+    {% set _ns_total = namespace(toplam_kayit=0) %}
     {% for grp in grouped.values() %}
+        {% set _ns_total.toplam_kayit = _ns_total.toplam_kayit + (grp.kayitlar|length) %}
         {% for app in grp.kayitlar %}
             {% if app.IsApproved == true %}{% set _ = onayli.append(1) %}{% endif %}
             {% if app.SunanOnayi == true and app.IsApproved is none %}{% set _ = bekleyen.append(1) %}{% endif %}
         {% endfor %}
     {% endfor %}
+    {% set toplam_kayit = _ns_total.toplam_kayit %}
     <div class="flex flex-wrap gap-3">
         <span class="bg-gray-100 text-gray-600 text-xs font-black px-3 py-1.5 rounded-xl">{{ grouped|length }} konu</span>
         <span class="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1.5 rounded-xl">{{ onayli|length }} tam onaylı</span>
@@ -58,7 +60,7 @@
 
     {# KONU BAZLI ACCORDION #}
     {% if grouped %}
-    {% for sunum_id, grp in grouped.items() | sort(attribute='1.hafta') %}
+    {% for sunum_id, grp in grouped.items() | sort(attribute='1.konu') | sort(attribute='1.hafta') %}
     {% set toplam = grp.kayitlar | length %}
     {% set onayli_sayi = grp.kayitlar | selectattr('IsApproved', 'equalto', true) | list | length %}
     {% set reddedilen_sayi = grp.kayitlar | selectattr('IsApproved', 'equalto', false) | list | length %}

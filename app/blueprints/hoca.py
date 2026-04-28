@@ -222,13 +222,13 @@ def hoca_sunum_panel():
             JOIN Bolumler b ON hb.BolumID = b.BolumID
             JOIN Donemler d ON b.DonemID = d.DonemID
             WHERE hb.HocaID = %s
-            ORDER BY d.Aktif DESC, d.DonemAdi DESC, b.BolumAdi
+            ORDER BY d.Aktif DESC, CASE WHEN b.OgretimTuru = 'Örgün' THEN 0 ELSE 1 END, d.DonemAdi DESC, b.BolumAdi
         """, (session['hoca_id'],))
     else:
         cursor.execute("""
             SELECT b.BolumID, b.BolumAdi, b.OgretimTuru, d.DonemAdi, d.DonemID, d.Aktif
             FROM Bolumler b JOIN Donemler d ON b.DonemID = d.DonemID
-            ORDER BY d.Aktif DESC, d.DonemAdi DESC, b.BolumAdi
+            ORDER BY d.Aktif DESC, CASE WHEN b.OgretimTuru = 'Örgün' THEN 0 ELSE 1 END, d.DonemAdi DESC, b.BolumAdi
         """)
     bolumler = cursor.fetchall()
 

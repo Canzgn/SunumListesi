@@ -107,7 +107,8 @@ def get_admin_allowed_turs():
             (bolum_ids,)
         )
         rows = cursor.fetchall()
-        return [r.OgretimTuru for r in rows] or ['Örgün', 'Gece']
+        turs = [r.OgretimTuru for r in rows] or ['Örgün', 'Gece']
+        return sorted(turs, key=lambda t: (t != 'Örgün', t))
     except Exception:
         return ['Örgün', 'Gece']
 

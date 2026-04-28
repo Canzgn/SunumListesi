@@ -85,12 +85,18 @@ def mesajlarim():
         """, (user_id,))
     elif role == 'admin':
         user_id = session.get('admin_id')
+        # Adminlere yalnızca kendi bölüm öğrencilerinden gelen (veya ID=NULL eski) mesajlar gösterilir
         cursor.execute("""
-            SELECT MesajID, GonderenRol, GonderenAdi, Konu, Icerik, Okundu, GonderimTarihi
-            FROM Mesajlar
-            WHERE AliciRol = 'admin' AND (AliciID = %s OR AliciID IS NULL)
-            ORDER BY GonderimTarihi DESC
-        """, (user_id,))
+            SELECT DISTINCT m.MesajID, m.GonderenRol, m.GonderenAdi, m.Konu, m.Icerik, m.Okundu, m.GonderimTarihi
+            FROM Mesajlar m
+            LEFT JOIN Ogrenciler o ON o.OgrenciID = m.GonderenID AND m.GonderenRol = 'student'
+            LEFT JOIN AdminBolumler ab ON ab.BolumID = o.BolumID AND ab.AdminID = %s
+            WHERE m.AliciRol = 'admin' AND m.AliciID = %s
+               OR (m.AliciRol = 'admin' AND m.AliciID IS NULL
+                   AND m.GonderenRol = 'student'
+                   AND ab.AdminID IS NOT NULL)
+            ORDER BY m.GonderimTarihi DESC
+        """, (user_id, user_id))
     else:
         flash('Erişim izniniz yok.', 'error')
         return redirect('/')
