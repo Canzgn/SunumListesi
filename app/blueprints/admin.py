@@ -90,6 +90,25 @@ def admin_panel():
 
     cursor.execute("SELECT DonemID, DonemAdi AS YilLabel FROM Donemler ORDER BY DonemID DESC")
     donemler = cursor.fetchall()
+
+    if admin_bolum_ids:
+        cursor.execute("SELECT DISTINCT haftano FROM VizeHaftalari WHERE bolumid = ANY(%s)", (admin_bolum_ids,))
+    else:
+        cursor.execute("""
+            SELECT DISTINCT vh.haftano FROM VizeHaftalari vh
+            JOIN Bolumler b ON b.bolumid = vh.bolumid WHERE b.ogretimturu = %s
+        """, (selected_tur,))
+    vize_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    if admin_bolum_ids:
+        cursor.execute("SELECT DISTINCT haftano FROM TatilKaydirmaHaftalari WHERE bolumid = ANY(%s)", (admin_bolum_ids,))
+    else:
+        cursor.execute("""
+            SELECT DISTINCT tkh.haftano FROM TatilKaydirmaHaftalari tkh
+            JOIN Bolumler b ON b.bolumid = tkh.bolumid WHERE b.ogretimturu = %s
+        """, (selected_tur,))
+    tatilkaydir_haftalar = {r.haftano for r in cursor.fetchall()}
+
     return render_template('admin/admin_panel.html',
                            schedule_data=schedule_data,
                            selected_tur=selected_tur,
@@ -99,7 +118,9 @@ def admin_panel():
                            tatil_cadisi_sayisi=tatil_cadisi_sayisi,
                            takvim_disi_sayisi=takvim_disi_sayisi,
                            tatil_tarihleri=tatil_tarihleri,
-                           akademik_bitis=akademik_bitis)
+                           akademik_bitis=akademik_bitis,
+                           vize_haftalar=vize_haftalar,
+                           tatilkaydir_haftalar=tatilkaydir_haftalar)
 
 
 # --- ÖĞRENCİ YÖNETİMİ ---

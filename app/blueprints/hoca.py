@@ -278,11 +278,32 @@ def hoca_sunum_panel():
     """, (secili_bolum_id,))
     takvim_disi_sayisi = cursor.fetchone()[0]
 
+    cursor.execute("SELECT haftano FROM VizeHaftalari WHERE bolumid = %s", (secili_bolum_id,))
+    vize_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("SELECT haftano FROM TatilKaydirmaHaftalari WHERE bolumid = %s", (secili_bolum_id,))
+    tatilkaydir_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("SELECT tarih FROM TatilGunleri ORDER BY tarih")
+    tatil_tarihleri = [r.tarih for r in cursor.fetchall()]
+
+    cursor.execute("""
+        SELECT MIN(d.donembitis) FROM Donemler d
+        JOIN Bolumler b ON b.donemid = d.donemid
+        WHERE b.bolumid = %s AND d.donembitis IS NOT NULL
+    """, (secili_bolum_id,))
+    ab_row = cursor.fetchone()
+    akademik_bitis = ab_row[0] if ab_row else None
+
     return render_template('hoca/hoca_sunum_panel.html', schedule_data=schedule_data,
                            bolumler=bolumler, secili_bolum=secili_bolum,
                            secili_bolum_id=secili_bolum_id,
                            tatil_cadisi_sayisi=tatil_cadisi_sayisi,
-                           takvim_disi_sayisi=takvim_disi_sayisi)
+                           takvim_disi_sayisi=takvim_disi_sayisi,
+                           vize_haftalar=vize_haftalar,
+                           tatilkaydir_haftalar=tatilkaydir_haftalar,
+                           tatil_tarihleri=tatil_tarihleri,
+                           akademik_bitis=akademik_bitis)
 
 
 # --- Soru Seçim Kayıtları (konu bazlı) ---

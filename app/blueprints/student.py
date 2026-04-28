@@ -93,6 +93,25 @@ def student_panel():
     cursor.execute("SELECT DISTINCT SunumID FROM SoruBasvurulari WHERE OgrenciNo = %s", (current_no,))
     my_question_ids = {row.SunumID for row in cursor.fetchall()}
 
+    cursor.execute("""
+        SELECT DISTINCT vh.haftano FROM VizeHaftalari vh
+        JOIN Bolumler b ON b.bolumid = vh.bolumid WHERE b.ogretimturu = %s
+    """, (selected_tur,))
+    vize_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("""
+        SELECT DISTINCT tkh.haftano FROM TatilKaydirmaHaftalari tkh
+        JOIN Bolumler b ON b.bolumid = tkh.bolumid WHERE b.ogretimturu = %s
+    """, (selected_tur,))
+    tatilkaydir_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("SELECT tarih FROM TatilGunleri ORDER BY tarih")
+    tatil_tarihleri = [r.tarih for r in cursor.fetchall()]
+
+    cursor.execute("SELECT MIN(d.donembitis) FROM Donemler d WHERE d.aktif=TRUE AND d.donembitis IS NOT NULL")
+    ab_row = cursor.fetchone()
+    akademik_bitis = ab_row[0] if ab_row else None
+
     return render_template('student/student_panel.html',
                            schedule_data=schedule_data,
                            selected_tur=selected_tur,
@@ -100,7 +119,11 @@ def student_panel():
                            my_basvuru_count=my_basvuru_count,
                            my_soru_count=my_soru_count,
                            my_applied_ids=my_applied_ids,
-                           my_question_ids=my_question_ids)
+                           my_question_ids=my_question_ids,
+                           vize_haftalar=vize_haftalar,
+                           tatilkaydir_haftalar=tatilkaydir_haftalar,
+                           tatil_tarihleri=tatil_tarihleri,
+                           akademik_bitis=akademik_bitis)
 
 
 @student_bp.route('/topic/<int:sunum_id>')
