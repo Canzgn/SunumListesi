@@ -852,14 +852,27 @@ def hoca_hafta_yonetimi():
         vize_records = cursor.fetchall()
         vize_haftalari = {r.haftano for r in vize_records}
 
+    tatilkaydir_haftalari = set()
+    tatilkaydir_records = []
+    if bolum_id:
+        cursor.execute(
+            "SELECT tatilkaydiraid, haftano FROM TatilKaydirmaHaftalari WHERE bolumid=%s ORDER BY haftano",
+            (bolum_id,)
+        )
+        tatilkaydir_records = cursor.fetchall()
+        tatilkaydir_haftalari = {r.haftano for r in tatilkaydir_records}
+
+    # Haftalar bazında tatil çakışması olan hafta numaraları
+    tatil_cadisi_haftalari = {s.HaftaNo for s in tatil_cadisi}
+
     cursor.execute("SELECT KonuID, KonuAdi FROM Konular ORDER BY SiraNo, KonuAdi")
     tum_konular = cursor.fetchall()
 
-    # Vize haftaları dahil tüm haftaları sıralı listele (slotsuz vize haftaları da görünsün)
+    # Vize + tatil kaydırma haftaları dahil tüm haftaları sıralı listele (boş haftalar da görünsün)
     slots_by_week = {}
     for s in slotlar:
         slots_by_week.setdefault(s.HaftaNo, []).append(s)
-    all_hafta_nos = sorted(set(s.HaftaNo for s in slotlar) | vize_haftalari)
+    all_hafta_nos = sorted(set(s.HaftaNo for s in slotlar) | vize_haftalari | tatilkaydir_haftalari)
     hafta_display = [(w, slots_by_week.get(w, [])) for w in all_hafta_nos]
 
     return render_template('hoca/hoca_hafta_yonetimi.html', bolumler=bolumler, slotlar=slotlar,
@@ -868,6 +881,9 @@ def hoca_hafta_yonetimi():
                            tatil_tarihleri=tatil_tarihleri, tatil_cadisi=tatil_cadisi,
                            takvim_disi=takvim_disi,
                            vize_haftalari=vize_haftalari, vize_records=vize_records,
+                           tatilkaydir_haftalari=tatilkaydir_haftalari,
+                           tatilkaydir_records=tatilkaydir_records,
+                           tatil_cadisi_haftalari=tatil_cadisi_haftalari,
                            hafta_display=hafta_display)
 
 
@@ -1171,4 +1187,57 @@ def hoca_vize_sil():
     cursor.execute("DELETE FROM VizeHaftalari WHERE vizeid=%s", (vize_id,))
     conn.commit()
     flash('Vize haftası etiketi silindi. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+@hoca_bp.route('/tatil_kaydir', methods=['POST'])
+@hoca_required
+def hoca_tatil_kaydir():
+    bolum_id = request.form.get('bolum_id', '')
+    hafta_no = request.form.get('hafta_no', '')
+    if not bolum_id or not hafta_no:
+        flash('Geçersiz parametreler.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi'))
+    hafta_no = int(hafta_no)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano >= %s",
+        (bolum_id, hafta_no)
+    )
+    etkilenen = cursor.fetchone()[0]
+    cursor.execute("""
+        UPDATE SunumProgrami
+        SET haftano = haftano + 1,
+            sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
+                               THEN sunumtarihi + make_interval(days => 7)
+                               ELSE NULL END
+        WHERE bolumid=%s AND haftano >= %s
+    """, (bolum_id, hafta_no))
+    cursor.execute(
+        "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (bolum_id, hafta_no)
+    )
+    conn.commit()
+    flash(
+        f'{hafta_no}. Hafta tatil kaydırması uygulandı. '
+        f'{etkilenen} slot bir hafta ileri kaydırıldı.',
+        'success'
+    )
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+@hoca_bp.route('/tatil_kaydir_sil', methods=['POST'])
+@hoca_required
+def hoca_tatil_kaydir_sil():
+    bolum_id = request.form.get('bolum_id', '')
+    tatilkaydir_id = request.form.get('tatilkaydir_id', '')
+    if not tatilkaydir_id:
+        flash('Geçersiz ID.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM TatilKaydirmaHaftalari WHERE tatilkaydiraid=%s", (tatilkaydir_id,))
+    conn.commit()
+    flash('Tatil kaydırma etiketi silindi. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
     return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
