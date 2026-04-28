@@ -26,6 +26,8 @@
         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>Örgün (Bekliyor)</span>
         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-violet-500 inline-block"></span>Gece (Bekliyor)</span>
         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>Atandı</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>Tatil (Kaydır)</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span>Tatil (Bilgi)</span>
     </div>
 
     {# TAKVİM #}
@@ -95,6 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
     calendar.render();
     fetchEvents();
     loadBolumler();
+    fetchTatilEvents();
 });
 
 function fetchEvents() {
@@ -122,6 +125,13 @@ function loadBolumler() {
                 sel.appendChild(opt);
             });
         }).catch(function() {});
+}
+
+function fetchTatilEvents() {
+    fetch('/api/tatil_gunleri?donem_id=1')
+        .then(r => r.json())
+        .then(events => { events.forEach(e => calendar.addEvent(e)); })
+        .catch(function() {});
 }
 </script>
 {% endblock %}

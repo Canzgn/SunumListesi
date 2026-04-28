@@ -17,7 +17,9 @@ class Config:
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5 MB
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_COOKIE_SECURE = os.environ.get('FLASK_DEBUG', 'false').lower() not in ('true', '1', 'yes')
+    # Secure flag yalnızca açıkça production olarak işaretlendiğinde aktif olur.
+    # Yerel geliştirmede HTTP üzerinden cookie çalışması için False kalmalı.
+    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV', 'development') == 'production'
 
     # Öğrenci e-posta alan adı
     STUDENT_EMAIL_DOMAIN = os.environ.get('STUDENT_EMAIL_DOMAIN', 'ogrenci.edu.tr')

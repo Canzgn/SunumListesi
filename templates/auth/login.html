@@ -153,9 +153,10 @@
 
     <script>
         function setRole(role) {
-            const roles = ['student','admin','hoca','kontrolcu'];
+            const roles = ['student','admin','hoca'];
             roles.forEach(r => {
                 const btn = document.getElementById('btn-' + r);
+                if (!btn) return;
                 btn.className = 'flex-1 py-2.5 rounded-xl font-black text-xs transition ' + (r === role ? 'tab-active' : 'tab-inactive');
             });
             document.getElementById('role-input').value = role;
@@ -164,8 +165,7 @@
             const labels = {
                 student: ['Öğrenci Numarası', '2021010001'],
                 admin: ['Admin Kullanıcı Adı', 'admin'],
-                hoca: ['Öğretmen Kullanıcı Adı', 'hoca_kullanici'],
-                kontrolcu: ['Soru Kont. Kullanıcı Adı', 'kontrolcu']
+                hoca: ['Öğretmen Kullanıcı Adı', 'hoca_kullanici']
             };
             label.textContent = labels[role][0];
             input.placeholder = labels[role][1];

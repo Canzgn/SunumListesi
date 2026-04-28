@@ -706,15 +706,25 @@ def hoca_hafta_yonetimi():
     tur = request.args.get('tur', 'Örgün')
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT b.BolumID, b.BolumAdi, b.OgretimTuru, d.DonemAdi
-        FROM HocaBolumler hb
-        JOIN Bolumler b ON hb.BolumID=b.BolumID
-        JOIN Donemler d ON b.DonemID=d.DonemID
-        WHERE hb.HocaID=%s ORDER BY d.Aktif DESC, b.BolumAdi
-    """, (session['hoca_id'],))
+    hoca_id = session.get('hoca_id')
+    if hoca_id and session.get('user_role') == 'hoca':
+        cursor.execute("""
+            SELECT b.BolumID, b.BolumAdi, b.OgretimTuru, d.DonemAdi
+            FROM HocaBolumler hb
+            JOIN Bolumler b ON hb.BolumID=b.BolumID
+            JOIN Donemler d ON b.DonemID=d.DonemID
+            WHERE hb.HocaID=%s ORDER BY d.Aktif DESC, b.BolumAdi
+        """, (hoca_id,))
+    else:
+        cursor.execute("""
+            SELECT b.BolumID, b.BolumAdi, b.OgretimTuru, d.DonemAdi
+            FROM Bolumler b JOIN Donemler d ON b.DonemID=d.DonemID
+            ORDER BY d.Aktif DESC, b.BolumAdi
+        """)
     bolumler = cursor.fetchall()
     slotlar = []
+    akademik_bitis, tatil_gunleri, tatil_tarihleri = None, [], []
+    tatil_cadisi, takvim_disi = [], []
     if bolum_id:
         cursor.execute("""
             SELECT sp.SunumID, sp.HaftaNo, sp.OgretimTuru, sp.SunumTarihi, k.KonuID, k.KonuAdi, k.SiraNo
@@ -722,10 +732,46 @@ def hoca_hafta_yonetimi():
             WHERE sp.BolumID=%s ORDER BY sp.HaftaNo, k.SiraNo
         """, (bolum_id,))
         slotlar = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT d.donembitis, d.donemid FROM Bolumler b
+            JOIN Donemler d ON b.DonemID = d.DonemID WHERE b.BolumID = %s
+        """, (bolum_id,))
+        donem_row = cursor.fetchone()
+        if donem_row:
+            akademik_bitis = donem_row.donembitis
+            cursor.execute("""
+                SELECT tatilid, tarih, aciklama, eylemtipi FROM TatilGunleri
+                WHERE donemid = %s ORDER BY tarih
+            """, (donem_row.donemid,))
+            tatil_gunleri = cursor.fetchall()
+            tatil_tarihleri = [t.tarih for t in tatil_gunleri]
+
+        for slot in slotlar:
+            if slot.SunumTarihi:
+                if slot.SunumTarihi in tatil_tarihleri:
+                    tatil_cadisi.append(slot)
+                if akademik_bitis and slot.SunumTarihi > akademik_bitis:
+                    takvim_disi.append(slot)
+
+    vize_haftalari = set()
+    vize_records = []
+    if bolum_id:
+        cursor.execute(
+            "SELECT vizeid, haftano FROM VizeHaftalari WHERE bolumid=%s ORDER BY haftano",
+            (bolum_id,)
+        )
+        vize_records = cursor.fetchall()
+        vize_haftalari = {r.haftano for r in vize_records}
+
     cursor.execute("SELECT KonuID, KonuAdi FROM Konular ORDER BY SiraNo, KonuAdi")
     tum_konular = cursor.fetchall()
     return render_template('hoca/hoca_hafta_yonetimi.html', bolumler=bolumler, slotlar=slotlar,
-                           secili_bolum_id=bolum_id, tum_konular=tum_konular, tur=tur)
+                           secili_bolum_id=bolum_id, tum_konular=tum_konular, tur=tur,
+                           akademik_bitis=akademik_bitis, tatil_gunleri=tatil_gunleri,
+                           tatil_tarihleri=tatil_tarihleri, tatil_cadisi=tatil_cadisi,
+                           takvim_disi=takvim_disi,
+                           vize_haftalari=vize_haftalari, vize_records=vize_records)
 
 
 @hoca_bp.route('/sunum_hafta_guncelle', methods=['POST'])
@@ -795,6 +841,24 @@ def hoca_sunum_tarih_guncelle():
     else:
         flash('Sunum tarihi güncellendi.')
 
+    # Tatil ve takvim dışı uyarıları (commit öncesi)
+    if bolum_id:
+        cursor.execute("""
+            SELECT tarih FROM TatilGunleri tg JOIN Bolumler b ON b.donemid=tg.donemid
+            WHERE b.bolumid=%s
+        """, (bolum_id,))
+        tatil_set = {row.tarih for row in cursor.fetchall()}
+        cursor.execute("""
+            SELECT d.donembitis FROM Donemler d JOIN Bolumler b ON b.donemid=d.donemid
+            WHERE b.bolumid=%s
+        """, (bolum_id,))
+        bitis_row = cursor.fetchone()
+        akademik_bitis = bitis_row.donembitis if bitis_row else None
+        if yeni_tarih in tatil_set:
+            flash(f'Uyarı: {yeni_tarih.strftime("%d.%m.%Y")} tatil günüdür. Yine de kaydedildi.', 'warning')
+        if akademik_bitis and yeni_tarih > akademik_bitis:
+            flash(f'Uyarı: Bu tarih akademik bitiş ({akademik_bitis.strftime("%d.%m.%Y")}) sonrasındadır.', 'warning')
+
     conn.commit()
     return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
 
@@ -852,4 +916,162 @@ def hoca_sunum_sil(sunum_id):
     cursor.execute("DELETE FROM SunumProgrami WHERE SunumID=%s", (sunum_id,))
     conn.commit()
     flash('Sunum slotu silindi.')
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+# --- Tatil Yönetimi ---
+
+@hoca_bp.route('/tatil_ekle', methods=['POST'])
+@hoca_required
+def hoca_tatil_ekle():
+    bolum_id = request.form.get('bolum_id')
+    tarih_str = request.form.get('tarih', '').strip()
+    aciklama = request.form.get('aciklama', '').strip()
+    eylemtipi = request.form.get('eylemtipi', 'bilgi')
+    if eylemtipi not in ('kaydir', 'iptal', 'bilgi'):
+        eylemtipi = 'bilgi'
+    try:
+        tarih = datetime.strptime(tarih_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Geçersiz tarih.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT donemid FROM Bolumler WHERE bolumid=%s", (bolum_id,))
+    b = cursor.fetchone()
+    if not b or not b.donemid:
+        flash('Bölüm dönemi bulunamadı.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+    cursor.execute(
+        "INSERT INTO TatilGunleri (donemid, tarih, aciklama, eylemtipi) VALUES (%s,%s,%s,%s)",
+        (b.donemid, tarih, aciklama or None, eylemtipi)
+    )
+    conn.commit()
+    flash(f'{tarih.strftime("%d.%m.%Y")} tatil günü eklendi.')
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+@hoca_bp.route('/tatil_sil/<int:tatil_id>', methods=['POST'])
+@hoca_required
+def hoca_tatil_sil(tatil_id):
+    bolum_id = request.form.get('bolum_id', '')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM TatilGunleri WHERE TatilID=%s", (tatil_id,))
+    conn.commit()
+    flash('Tatil günü silindi.')
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+# --- Domino Kaydırma ---
+
+@hoca_bp.route('/domino_uygula', methods=['POST'])
+@hoca_required
+def hoca_domino_uygula():
+    bolum_id = request.form.get('bolum_id')
+    tatil_tarihi_str = request.form.get('tatil_tarihi')
+    shift_days = int(request.form.get('shift_days', 7))
+    try:
+        tatil_tarihi = datetime.strptime(tatil_tarihi_str, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        flash('Geçersiz tarih.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) FROM SunumProgrami
+        WHERE bolumid=%s AND sunumtarihi >= %s AND sunumtarihi IS NOT NULL
+    """, (bolum_id, tatil_tarihi))
+    etkilenen = cursor.fetchone()[0]
+    cursor.execute("""
+        UPDATE SunumProgrami
+        SET sunumtarihi = sunumtarihi + make_interval(days => %s)
+        WHERE bolumid=%s AND sunumtarihi >= %s AND sunumtarihi IS NOT NULL
+    """, (shift_days, bolum_id, tatil_tarihi))
+    conn.commit()
+    cursor.execute("""
+        SELECT COUNT(*) FROM SunumProgrami sp
+        JOIN TatilGunleri tg ON sp.sunumtarihi = tg.tarih
+        JOIN Bolumler b ON b.bolumid = sp.bolumid
+        WHERE sp.bolumid=%s AND tg.donemid=b.donemid
+    """, (bolum_id,))
+    hala_tatil = cursor.fetchone()[0]
+    flash(f'{etkilenen} slot {shift_days} gün ileri kaydırıldı.', 'success')
+    if hala_tatil:
+        flash(f'Uyarı: {hala_tatil} slot hâlâ tatil gününe denk geliyor. Tekrar kontrol edin.', 'warning')
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+@hoca_bp.route('/domino_preview')
+@hoca_required
+def hoca_domino_preview():
+    from flask import jsonify as _jsonify
+    bolum_id = request.args.get('bolum_id')
+    tatil_tarihi_str = request.args.get('tatil_tarihi')
+    try:
+        tatil_tarihi = datetime.strptime(tatil_tarihi_str, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return _jsonify({'error': 'Geçersiz tarih'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT sp.sunumid, sp.haftano, k.konuadi, sp.sunumtarihi::text AS sunumtarihi
+        FROM SunumProgrami sp JOIN Konular k ON sp.KonuID=k.KonuID
+        WHERE sp.bolumid=%s AND sp.sunumtarihi >= %s ORDER BY sp.sunumtarihi
+    """, (bolum_id, tatil_tarihi))
+    rows = cursor.fetchall()
+    return _jsonify([{'sunumid': r.sunumid, 'haftano': r.haftano,
+                      'konuadi': r.konuadi, 'sunumtarihi': r.sunumtarihi} for r in rows])
+
+
+@hoca_bp.route('/vize_ekle', methods=['POST'])
+@hoca_required
+def hoca_vize_ekle():
+    bolum_id = request.form.get('bolum_id', '')
+    hafta_no = request.form.get('hafta_no', '')
+    if not bolum_id or not hafta_no:
+        flash('Geçersiz parametreler.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi'))
+    hafta_no = int(hafta_no)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano >= %s",
+        (bolum_id, hafta_no)
+    )
+    etkilenen = cursor.fetchone()[0]
+    cursor.execute("""
+        UPDATE SunumProgrami
+        SET haftano = haftano + 1,
+            sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
+                               THEN sunumtarihi + make_interval(days => 7)
+                               ELSE NULL END
+        WHERE bolumid=%s AND haftano >= %s
+    """, (bolum_id, hafta_no))
+    cursor.execute(
+        "INSERT INTO VizeHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (bolum_id, hafta_no)
+    )
+    conn.commit()
+    flash(
+        f'{hafta_no}. Hafta vize haftası olarak eklendi. '
+        f'{etkilenen} slot bir hafta ileri kaydırıldı.',
+        'success'
+    )
+    return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+
+
+@hoca_bp.route('/vize_sil', methods=['POST'])
+@hoca_required
+def hoca_vize_sil():
+    bolum_id = request.form.get('bolum_id', '')
+    vize_id = request.form.get('vize_id', '')
+    if not vize_id:
+        flash('Geçersiz vize ID.', 'error')
+        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM VizeHaftalari WHERE vizeid=%s", (vize_id,))
+    conn.commit()
+    flash('Vize haftası etiketi silindi. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
     return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))

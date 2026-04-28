@@ -58,10 +58,35 @@ def admin_panel():
         cursor.execute("SELECT DonemID, DonemAdi AS YilLabel FROM Donemler ORDER BY DonemID DESC")
         donemler = cursor.fetchall()
         return render_template('admin/admin_panel.html', schedule_data=[], selected_tur=selected_tur,
-                               donemler=donemler, allowed_turs=allowed_turs)
+                               donemler=donemler, allowed_turs=allowed_turs,
+                               tatil_cadisi_sayisi=0, takvim_disi_sayisi=0,
+                               tatil_tarihleri=[], akademik_bitis=None)
 
     schedule_data = build_schedule_data(slot_ids, slots)
     hafta_listesi = sorted(set(s.HaftaNo for s in slots))
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM SunumProgrami sp
+        JOIN TatilGunleri tg ON sp.sunumtarihi=tg.tarih
+        JOIN Bolumler b ON b.bolumid=sp.bolumid
+        WHERE b.donemid=tg.donemid
+    """)
+    tatil_cadisi_sayisi = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM SunumProgrami sp
+        JOIN Bolumler b ON sp.bolumid=b.bolumid
+        JOIN Donemler d ON b.donemid=d.donemid
+        WHERE d.donembitis IS NOT NULL AND sp.sunumtarihi > d.donembitis AND sp.sunumtarihi IS NOT NULL
+    """)
+    takvim_disi_sayisi = cursor.fetchone()[0]
+
+    cursor.execute("SELECT tarih FROM TatilGunleri ORDER BY tarih")
+    tatil_tarihleri = [r.tarih for r in cursor.fetchall()]
+
+    cursor.execute("SELECT MIN(d.donembitis) FROM Donemler d WHERE d.aktif=TRUE AND d.donembitis IS NOT NULL")
+    ab_row = cursor.fetchone()
+    akademik_bitis = ab_row[0] if ab_row else None
 
     cursor.execute("SELECT DonemID, DonemAdi AS YilLabel FROM Donemler ORDER BY DonemID DESC")
     donemler = cursor.fetchall()
@@ -70,7 +95,11 @@ def admin_panel():
                            selected_tur=selected_tur,
                            donemler=donemler,
                            allowed_turs=allowed_turs,
-                           hafta_listesi=hafta_listesi)
+                           hafta_listesi=hafta_listesi,
+                           tatil_cadisi_sayisi=tatil_cadisi_sayisi,
+                           takvim_disi_sayisi=takvim_disi_sayisi,
+                           tatil_tarihleri=tatil_tarihleri,
+                           akademik_bitis=akademik_bitis)
 
 
 # --- ÖĞRENCİ YÖNETİMİ ---

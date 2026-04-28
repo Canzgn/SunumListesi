@@ -151,3 +151,27 @@ def api_takvim_events():
             }
         })
     return jsonify(events)
+
+
+@api_bp.route('/tatil_gunleri')
+def api_tatil_gunleri():
+    donem_id = request.args.get('donem_id', type=int)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if donem_id:
+        cursor.execute(
+            "SELECT tarih, aciklama, eylemtipi FROM TatilGunleri WHERE donemid=%s ORDER BY tarih",
+            (donem_id,)
+        )
+    else:
+        cursor.execute("SELECT tarih, aciklama, eylemtipi FROM TatilGunleri ORDER BY tarih")
+    events = []
+    for t in cursor.fetchall():
+        events.append({
+            "title": t.aciklama or "Tatil",
+            "start": t.tarih.isoformat(),
+            "display": "background",
+            "color": "#ef4444" if t.eylemtipi == 'kaydir' else "#f59e0b",
+            "extendedProps": {"eylemtipi": t.eylemtipi}
+        })
+    return jsonify(events)

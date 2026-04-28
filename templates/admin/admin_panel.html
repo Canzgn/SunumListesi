@@ -45,7 +45,41 @@
             </div>
         </div>
     </div>
-    {# ===== BAŞLIK + FİLTRE + TOPLU İŞLEM BUTONLARI ===== #}
+
+    {# TATİL VE TAKVİM DIŞI UYARILARI #}
+    {% if tatil_cadisi_sayisi > 0 or takvim_disi_sayisi > 0 %}
+    <div class="space-y-2">
+        {% if tatil_cadisi_sayisi > 0 %}
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-red-700">{{ tatil_cadisi_sayisi }} sunum tatil gününe denk geliyor</p>
+                    <p class="text-xs text-red-500">Hoca hafta yönetiminden domino kaydırma uygulamalı.</p>
+                </div>
+            </div>
+            <a href="{{ url_for('hoca.hoca_hafta_yonetimi') }}"
+               class="shrink-0 bg-red-600 hover:bg-red-700 text-white text-xs font-black px-4 py-2 rounded-xl transition">
+                Hafta Yönetimi →
+            </a>
+        </div>
+        {% endif %}
+        {% if takvim_disi_sayisi > 0 %}
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+            <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
+            <div>
+                <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
+                <p class="text-xs text-amber-600">
+                    19 ve 26 Haziran — 1 Mayıs + Kurban Bayramı domino kaymasından zorunlu.
+                    Öğrenci ve idareyi bilgilendirin.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ===== BAŞLIK + FİLTRE + TOPLU İŞLEM BUTONLARI =====#}
     <div class="bg-white p-5 rounded-2xl shadow-lg border-b-4 border-blue-600">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Sunum Yönetim Paneli</h1>
@@ -139,6 +173,11 @@
         {{ sunum.HaftaNo }}. HAFTA
         {% if sunum.SunumTarihi %}
         <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
+        {% if sunum.SunumTarihi in tatil_tarihleri %}
+        <span class="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-triangle-exclamation"></i> Tatil</span>
+        {% elif akademik_bitis and sunum.SunumTarihi > akademik_bitis %}
+        <span class="text-[9px] font-black bg-amber-400 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-calendar-xmark"></i> Takvim Dışı</span>
+        {% endif %}
         {% endif %}
         <form action="/admin/update_hafta_tarihi" method="POST" class="ml-auto flex items-center gap-2 normal-case not-italic tracking-normal">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
