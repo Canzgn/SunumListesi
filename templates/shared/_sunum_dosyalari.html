@@ -3,11 +3,13 @@
      dosyalar     : list of {DosyaID, DosyaTipi, DosyaAdi, DosyaBoyutu,
                               YuklemeTarihi, Aciklama, YukleyenNo, YukleyenAd}
      compact      : (opsiyonel, default False) — daha sıkı görünüm
+   Not: Yükleyen kişi metadata olarak gösterilir; dosyalar SUNUM EKİBİNE aittir,
+   ekipteki tüm öğrenciler indirip silebilir.
 ================================================ #}
 {% set _compact = compact|default(false) %}
 <div class="bg-white rounded-xl border border-gray-200 p-3">
     <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center justify-between">
-        <span><i class="fa-solid fa-folder-open text-blue-400 mr-1"></i>Yüklenen Dosyalar</span>
+        <span><i class="fa-solid fa-folder-open text-blue-400 mr-1"></i>Ekip Dosyaları</span>
         <span class="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded">{{ dosyalar|length }}</span>
     </p>
     {% if dosyalar %}
@@ -31,7 +33,16 @@
                     <p class="text-[10px] text-gray-400 font-bold flex flex-wrap gap-2">
                         {% if d.YuklemeTarihi %}<span><i class="fa-regular fa-clock"></i> {{ d.YuklemeTarihi.strftime('%d.%m.%Y %H:%M') }}</span>{% endif %}
                         {% if d.DosyaBoyutu %}<span>{{ (d.DosyaBoyutu / 1024 / 1024) | round(2) }} MB</span>{% endif %}
-                        {% if d.YukleyenNo %}<span><i class="fa-solid fa-user"></i> {{ d.YukleyenNo }}{% if d.YukleyenAd %} — {{ d.YukleyenAd }}{% endif %}</span>{% endif %}
+                        {% if d.YukleyenNo %}
+                            <span title="Yükleyen ekip üyesi">
+                                <i class="fa-solid fa-user"></i> {{ d.YukleyenNo }}{% if d.YukleyenAd %} — {{ d.YukleyenAd }}{% endif %}
+                                {% if session.user_role == 'student' and d.YukleyenNo == session.student_no %}
+                                    <span class="ml-1 bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px]">siz yüklediniz</span>
+                                {% elif session.user_role == 'student' %}
+                                    <span class="ml-1 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px]">ekip arkadaşınız</span>
+                                {% endif %}
+                            </span>
+                        {% endif %}
                     </p>
                     {% if d.Aciklama %}<p class="text-[10px] text-gray-500 italic mt-0.5">{{ d.Aciklama }}</p>{% endif %}
                     {% endif %}

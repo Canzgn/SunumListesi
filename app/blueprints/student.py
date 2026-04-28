@@ -600,6 +600,91 @@ def student_sunum_dosya_indir(dosya_id):
     return send_from_directory(directory, filename, as_attachment=True, download_name=row.DosyaAdi)
 
 
+# =====================================================================
+# GENEL SUNUM ARŞİVİ – tüm girilmiş roller (öğrenci, hoca, admin, kontrolcü)
+# =====================================================================
+
+@student_bp.route('/sunum/arsiv')
+@login_required
+def sunum_arsivi():
+    """Yüklenen tüm sunum dosyalarını dönem/bölüm/tip filtreleriyle gösterir."""
+    donem_id = request.args.get('donem_id', type=int)
+    bolum_id = request.args.get('bolum_id', type=int)
+    tip = (request.args.get('tip') or '').strip().lower()
+    q = (request.args.get('q') or '').strip()
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT DonemID, DonemAdi FROM Donemler ORDER BY DonemID DESC")
+    donemler = cursor.fetchall()
+    cursor.execute("SELECT BolumID, BolumAdi, OgretimTuru FROM Bolumler ORDER BY BolumAdi")
+    bolumler = cursor.fetchall()
+
+    # Dinamik WHERE
+    where_parts = []
+    params = []
+    if donem_id:
+        where_parts.append("sp.DonemID = %s"); params.append(donem_id)
+    if bolum_id:
+        where_parts.append("sp.BolumID = %s"); params.append(bolum_id)
+    if tip in ('sunum', 'demo', 'kaynak'):
+        where_parts.append("d.DosyaTipi = %s"); params.append(tip)
+    if q:
+        where_parts.append("(LOWER(d.DosyaAdi) LIKE %s OR LOWER(k.KonuAdi) LIKE %s)")
+        like = f"%{q.lower()}%"
+        params.extend([like, like])
+
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    cursor.execute(f"""
+        SELECT d.DosyaID, d.DosyaTipi, d.DosyaAdi, d.DosyaBoyutu, d.YuklemeTarihi, d.Aciklama,
+               d.SunumID, k.KonuAdi, sp.HaftaNo, sp.SunumTarihi, sp.OgretimTuru,
+               b.BolumAdi, dn.DonemAdi,
+               o.OgrenciNo AS YukleyenNo, o.AdSoyad AS YukleyenAd
+        FROM SunumDosyalari d
+        JOIN SunumProgrami sp ON sp.SunumID = d.SunumID
+        JOIN Konular k ON k.KonuID = sp.KonuID
+        LEFT JOIN Bolumler b ON b.BolumID = sp.BolumID
+        LEFT JOIN Donemler dn ON dn.DonemID = sp.DonemID
+        LEFT JOIN Ogrenciler o ON o.OgrenciID = d.YukleyenOgrenciID
+        {where_sql}
+        ORDER BY d.YuklemeTarihi DESC
+        LIMIT 500
+    """, tuple(params))
+    dosyalar = cursor.fetchall()
+
+    # Her dosya için sunum ekibini topla (tek sorguda)
+    sunum_ids = list({d.SunumID for d in dosyalar})
+    ekipler = {}
+    if sunum_ids:
+        cursor.execute("""
+            SELECT sg.SunumID, o.OgrenciNo, o.AdSoyad
+            FROM SunumGorevlileri sg
+            JOIN Ogrenciler o ON o.OgrenciID = sg.OgrenciID
+            WHERE sg.SunumID = ANY(%s)
+        """, (sunum_ids,))
+        for r in cursor.fetchall():
+            ekipler.setdefault(r.SunumID, []).append(r)
+
+    # Tip dağılımı (üst kart)
+    cursor.execute(f"""
+        SELECT d.DosyaTipi, COUNT(*) AS sayi
+        FROM SunumDosyalari d
+        JOIN SunumProgrami sp ON sp.SunumID = d.SunumID
+        JOIN Konular k ON k.KonuID = sp.KonuID
+        {where_sql}
+        GROUP BY d.DosyaTipi
+    """, tuple(params))
+    tip_dagilimi = {r.DosyaTipi: r.sayi for r in cursor.fetchall()}
+
+    return render_template('shared/sunum_arsivi.html',
+                           dosyalar=dosyalar, ekipler=ekipler,
+                           donemler=donemler, bolumler=bolumler,
+                           tip_dagilimi=tip_dagilimi,
+                           f_donem=donem_id, f_bolum=bolum_id, f_tip=tip, f_q=q)
+
+
 @student_bp.route('/sunum/<int:sunum_id>/soru_onay/<int:basvuru_id>', methods=['POST'])
 @student_required
 def student_sunum_soru_onay(sunum_id, basvuru_id):

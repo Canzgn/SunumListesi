@@ -46,9 +46,14 @@
 
         {# ===== DOSYA YÜKLEME ===== #}
         <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-            <h2 class="text-xs font-black text-gray-400 uppercase mb-4 tracking-widest border-b border-gray-100 pb-2">
-                <i class="fa-solid fa-cloud-arrow-up mr-1 text-blue-400"></i>Sunum Dosyaları
+            <h2 class="text-xs font-black text-gray-400 uppercase mb-2 tracking-widest border-b border-gray-100 pb-2">
+                <i class="fa-solid fa-cloud-arrow-up mr-1 text-blue-400"></i>Sunum Ekibi Dosyaları
             </h2>
+            <p class="text-[11px] text-gray-500 font-bold mb-4 leading-relaxed">
+                <i class="fa-solid fa-users text-emerald-500 mr-1"></i>
+                Bu alan <span class="font-black text-emerald-700">tüm sunum ekibinin ortak alanıdır</span>.
+                Ekipteki herkes yükleyebilir, indirebilir ve silebilir. Yükleyen kişinin adı sadece bilgi amacıyla gösterilir.
+            </p>
 
             <form method="POST" action="{{ url_for('student.student_sunum_dosya_yukle', sunum_id=topic.SunumID) }}"
                   enctype="multipart/form-data" class="space-y-3 mb-5">
@@ -91,10 +96,19 @@
                                 bg-{{ tip_color }}-100 text-{{ tip_color }}-700">{{ d.DosyaTipi }}</span>
                             <span class="text-sm font-black text-gray-800 truncate">{{ d.DosyaAdi }}</span>
                         </div>
-                        <div class="flex items-center gap-3 text-[10px] text-gray-400 font-bold">
+                        <div class="flex items-center gap-3 text-[10px] text-gray-400 font-bold flex-wrap">
                             <span><i class="fa-regular fa-clock"></i> {{ d.YuklemeTarihi.strftime('%d.%m.%Y %H:%M') if d.YuklemeTarihi else '--' }}</span>
                             {% if d.DosyaBoyutu %}<span>{{ (d.DosyaBoyutu / 1024 / 1024) | round(2) }} MB</span>{% endif %}
-                            {% if d.YukleyenNo %}<span><i class="fa-solid fa-user"></i> {{ d.YukleyenNo }}</span>{% endif %}
+                            {% if d.YukleyenNo %}
+                                <span>
+                                    <i class="fa-solid fa-user"></i> {{ d.YukleyenNo }}{% if d.YukleyenAd %} — {{ d.YukleyenAd }}{% endif %}
+                                    {% if d.YukleyenNo == session.student_no %}
+                                        <span class="ml-1 bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px]">siz</span>
+                                    {% else %}
+                                        <span class="ml-1 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px]">ekip arkadaşınız</span>
+                                    {% endif %}
+                                </span>
+                            {% endif %}
                         </div>
                         {% if d.Aciklama %}<p class="text-xs text-gray-500 mt-1 italic">{{ d.Aciklama }}</p>{% endif %}
                     </div>
