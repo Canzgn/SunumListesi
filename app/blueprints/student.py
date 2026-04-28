@@ -2,7 +2,8 @@
 Student Blueprint – Öğrenci paneli, başvurular, profil (SRP).
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import (Blueprint, render_template, request, redirect, url_for,
+                   session, flash, abort, current_app, send_from_directory)
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
@@ -14,6 +15,24 @@ from app.utils import allowed_file, basvuru_acik_mi
 from app.helpers import build_schedule_data
 
 student_bp = Blueprint('student', __name__)
+
+# Sunum dosyası (sunum/demo/kaynak) için izinli uzantılar
+ALLOWED_SUNUM_EXTENSIONS = {
+    'pdf', 'pptx', 'ppt', 'docx', 'doc', 'odp', 'odt',
+    'mp4', 'webm', 'mov',
+    'zip', 'rar', '7z',
+    'png', 'jpg', 'jpeg',
+}
+
+
+def _is_sunan(cursor, sunum_id, current_no):
+    """Verilen öğrenci numarası bu sunumun atanmış sahiplerinden mi?"""
+    cursor.execute("""
+        SELECT 1 FROM SunumGorevlileri sg
+        JOIN Ogrenciler o ON o.OgrenciID = sg.OgrenciID
+        WHERE sg.SunumID = %s AND o.OgrenciNo = %s
+    """, (sunum_id, current_no))
+    return cursor.fetchone() is not None
 
 
 @student_bp.route('/panel')
@@ -93,7 +112,8 @@ def student_topic_detail(sunum_id):
     basvurular = cursor.fetchall()
 
     cursor.execute("""
-        SELECT sb.SoruBasvuruID, o.OgrenciNo, o.AdSoyad, sb.IsApproved, sb.ZamanDamgasi, sb.RejectReason
+        SELECT sb.SoruBasvuruID, o.OgrenciNo, o.AdSoyad, sb.IsApproved, sb.ZamanDamgasi, sb.RejectReason,
+               sb.SoruIcerigi, sb.SunanOnayi, sb.SunanOnayTarihi, sb.SunanRedSebep
         FROM SoruBasvurulari sb
         JOIN Ogrenciler o ON o.OgrenciNo = sb.OgrenciNo
         WHERE sb.SunumID = %s
@@ -104,6 +124,7 @@ def student_topic_detail(sunum_id):
     current_no = session.get('student_no')
     my_topic_app = None
     my_question = None
+    is_sunan = False
     if current_no:
         cursor.execute("""
             SELECT BasvuruID FROM KonuBasvurulari
@@ -113,10 +134,12 @@ def student_topic_detail(sunum_id):
         cursor.execute("SELECT SoruBasvuruID FROM SoruBasvurulari WHERE SunumID = %s AND OgrenciNo = %s",
                        (sunum_id, current_no))
         my_question = cursor.fetchone()
+        is_sunan = _is_sunan(cursor, sunum_id, current_no)
 
     return render_template('student/student_topic_detail.html', topic=topic, atananlar=atananlar,
                            basvurular=basvurular, soru_soranlar=soru_soranlar,
-                           my_topic_app=my_topic_app, my_question=my_question)
+                           my_topic_app=my_topic_app, my_question=my_question,
+                           is_sunan=is_sunan)
 
 
 @student_bp.route('/all_applications')
@@ -302,11 +325,15 @@ def student_apply_question():
         flash("3 soru hakkınızı kullandınız. Yeni başvuru yapamazsınız.", "error")
         return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
 
+    soru_icerigi = (request.form.get('soru_icerigi') or '').strip() or None
+    if soru_icerigi and len(soru_icerigi) > 2000:
+        soru_icerigi = soru_icerigi[:2000]
+
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     cursor.execute("""
-        INSERT INTO SoruBasvurulari (SunumID, OgrenciNo, ZamanDamgasi)
-        VALUES (%s, %s, %s)
-    """, (sunum_id, current_no, now_str))
+        INSERT INTO SoruBasvurulari (SunumID, OgrenciNo, ZamanDamgasi, SoruIcerigi)
+        VALUES (%s, %s, %s, %s)
+    """, (sunum_id, current_no, now_str, soru_icerigi))
     conn.commit()
     flash(f"Soru başvurunuz alındı! ({soru_count + 1}/3 soru hakkı kullanıldı)")
     return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
@@ -407,3 +434,210 @@ def student_profile_edit():
 @student_required
 def mesaj_gonder_page():
     return render_template('student/mesaj_gonder.html')
+
+
+# =====================================================================
+# SUNUM YÖNETİMİ – sadece sunumu yapan öğrenciler için
+# Dosya yükleme (sunum/demo/kaynak) + soruya onay verme
+# =====================================================================
+
+@student_bp.route('/sunum/<int:sunum_id>/yonetim')
+@student_required
+def student_sunum_yonetim(sunum_id):
+    """Sunum sahibinin kendi sunumunu yönettiği panel."""
+    current_no = session['student_no']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if not _is_sunan(cursor, sunum_id, current_no):
+        abort(403)
+
+    cursor.execute("""
+        SELECT sp.SunumID, k.KonuAdi, sp.HaftaNo, sp.OgretimTuru, sp.SunumTarihi
+        FROM SunumProgrami sp JOIN Konular k ON sp.KonuID = k.KonuID
+        WHERE sp.SunumID = %s
+    """, (sunum_id,))
+    topic = cursor.fetchone()
+    if not topic:
+        abort(404)
+
+    cursor.execute("""
+        SELECT o.OgrenciNo, o.AdSoyad
+        FROM SunumGorevlileri sg JOIN Ogrenciler o ON o.OgrenciID = sg.OgrenciID
+        WHERE sg.SunumID = %s
+    """, (sunum_id,))
+    atananlar = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT d.DosyaID, d.DosyaTipi, d.DosyaAdi, d.DosyaBoyutu, d.YuklemeTarihi, d.Aciklama,
+               o.OgrenciNo AS YukleyenNo, o.AdSoyad AS YukleyenAd
+        FROM SunumDosyalari d
+        LEFT JOIN Ogrenciler o ON o.OgrenciID = d.YukleyenOgrenciID
+        WHERE d.SunumID = %s
+        ORDER BY d.YuklemeTarihi DESC
+    """, (sunum_id,))
+    dosyalar = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT sb.SoruBasvuruID, sb.OgrenciNo, o.AdSoyad, sb.SoruIcerigi,
+               sb.SunanOnayi, sb.SunanOnayTarihi, sb.SunanRedSebep,
+               sb.IsApproved, sb.RejectReason, sb.ZamanDamgasi
+        FROM SoruBasvurulari sb
+        LEFT JOIN Ogrenciler o ON o.OgrenciNo = sb.OgrenciNo
+        WHERE sb.SunumID = %s
+        ORDER BY (sb.SunanOnayi IS NULL) DESC, sb.ZamanDamgasi ASC
+    """, (sunum_id,))
+    sorular = cursor.fetchall()
+
+    return render_template('student/student_sunum_yonetim.html',
+                           topic=topic, atananlar=atananlar,
+                           dosyalar=dosyalar, sorular=sorular,
+                           allowed_extensions=sorted(ALLOWED_SUNUM_EXTENSIONS),
+                           max_size_mb=current_app.config.get('SUNUM_MAX_FILE_SIZE', 25 * 1024 * 1024) // (1024 * 1024))
+
+
+@student_bp.route('/sunum/<int:sunum_id>/dosya_yukle', methods=['POST'])
+@student_required
+def student_sunum_dosya_yukle(sunum_id):
+    from app.services.storage import get_storage, build_object_key, StorageError
+    current_no = session['student_no']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if not _is_sunan(cursor, sunum_id, current_no):
+        abort(403)
+
+    dosya_tipi = (request.form.get('dosya_tipi') or '').strip()
+    if dosya_tipi not in ('sunum', 'demo', 'kaynak'):
+        flash('Geçersiz dosya tipi.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    aciklama = (request.form.get('aciklama') or '').strip() or None
+    file = request.files.get('dosya')
+    if not file or not file.filename:
+        flash('Dosya seçilmedi.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in ALLOWED_SUNUM_EXTENSIONS:
+        flash(f'Bu dosya tipi (.{ext}) desteklenmiyor.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    # Boyut kontrolü (stream)
+    file.stream.seek(0, os.SEEK_END)
+    size = file.stream.tell()
+    file.stream.seek(0)
+    max_size = current_app.config.get('SUNUM_MAX_FILE_SIZE', 25 * 1024 * 1024)
+    if size > max_size:
+        flash(f'Dosya boyutu {max_size // (1024 * 1024)} MB sınırını aşıyor.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    storage = get_storage()
+    key = build_object_key(sunum_id, dosya_tipi, file.filename)
+    try:
+        actual_size = storage.upload(file.stream, key)
+    except StorageError as e:
+        current_app.logger.error('Sunum dosyası yükleme hatası: %s', e)
+        flash('Dosya yüklenirken hata oluştu.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    cursor.execute("SELECT OgrenciID FROM Ogrenciler WHERE OgrenciNo=%s", (current_no,))
+    ogr = cursor.fetchone()
+    cursor.execute("""
+        INSERT INTO SunumDosyalari (SunumID, YukleyenOgrenciID, DosyaTipi, DosyaAdi, DosyaYolu, DosyaBoyutu, Aciklama)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (sunum_id, ogr.OgrenciID if ogr else None, dosya_tipi, file.filename, key, actual_size, aciklama))
+    conn.commit()
+    flash(f"'{file.filename}' başarıyla yüklendi.")
+    return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+
+@student_bp.route('/sunum/dosya/<int:dosya_id>/sil', methods=['POST'])
+@student_required
+def student_sunum_dosya_sil(dosya_id):
+    from app.services.storage import get_storage
+    current_no = session['student_no']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DosyaYolu, SunumID FROM SunumDosyalari WHERE DosyaID = %s", (dosya_id,))
+    row = cursor.fetchone()
+    if not row:
+        abort(404)
+    if not _is_sunan(cursor, row.SunumID, current_no):
+        abort(403)
+    try:
+        get_storage().delete(row.DosyaYolu)
+    except Exception as e:
+        current_app.logger.warning('Storage silme hatası: %s', e)
+    cursor.execute("DELETE FROM SunumDosyalari WHERE DosyaID=%s", (dosya_id,))
+    conn.commit()
+    flash('Dosya silindi.')
+    return redirect(url_for('student.student_sunum_yonetim', sunum_id=row.SunumID))
+
+
+@student_bp.route('/sunum/dosya/<int:dosya_id>/indir')
+@student_required
+def student_sunum_dosya_indir(dosya_id):
+    """Auth check sonrası dosyayı indirir (local: stream, supabase: signed URL'e redirect)."""
+    from app.services.storage import get_storage, StorageError
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DosyaYolu, DosyaAdi FROM SunumDosyalari WHERE DosyaID=%s", (dosya_id,))
+    row = cursor.fetchone()
+    if not row:
+        abort(404)
+    storage = get_storage()
+    if storage.is_remote:
+        try:
+            url = storage.get_signed_url(row.DosyaYolu, expires_in=300)
+        except StorageError as e:
+            current_app.logger.error('Signed URL hatası: %s', e)
+            abort(500)
+        return redirect(url)
+    try:
+        directory, filename = storage.open_for_send(row.DosyaYolu)
+    except StorageError:
+        abort(404)
+    return send_from_directory(directory, filename, as_attachment=True, download_name=row.DosyaAdi)
+
+
+@student_bp.route('/sunum/<int:sunum_id>/soru_onay/<int:basvuru_id>', methods=['POST'])
+@student_required
+def student_sunum_soru_onay(sunum_id, basvuru_id):
+    """Sunum sahibinin soru başvurusuna onay/red vermesi (kontrolcüden bağımsız ön onay)."""
+    current_no = session['student_no']
+    action = request.form.get('action', 'approve')
+    reject_reason = (request.form.get('reject_reason') or '').strip() or 'Sunum sahibi tarafından reddedildi.'
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if not _is_sunan(cursor, sunum_id, current_no):
+        abort(403)
+    cursor.execute("SELECT SunumID FROM SoruBasvurulari WHERE SoruBasvuruID=%s", (basvuru_id,))
+    sb = cursor.fetchone()
+    if not sb or sb.SunumID != sunum_id:
+        abort(404)
+
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if action == 'approve':
+        cursor.execute("""
+            UPDATE SoruBasvurulari
+               SET SunanOnayi=TRUE, SunanRedSebep=NULL, SunanOnayTarihi=%s
+             WHERE SoruBasvuruID=%s
+        """, (now_str, basvuru_id))
+        flash('Soruyu onayladınız.')
+    elif action == 'reject':
+        cursor.execute("""
+            UPDATE SoruBasvurulari
+               SET SunanOnayi=FALSE, SunanRedSebep=%s, SunanOnayTarihi=%s
+             WHERE SoruBasvuruID=%s
+        """, (reject_reason[:255], now_str, basvuru_id))
+        flash('Soruyu reddettiniz.')
+    elif action == 'reset':
+        cursor.execute("""
+            UPDATE SoruBasvurulari
+               SET SunanOnayi=NULL, SunanRedSebep=NULL, SunanOnayTarihi=NULL
+             WHERE SoruBasvuruID=%s
+        """, (basvuru_id,))
+        flash('Onay durumu sıfırlandı.')
+    else:
+        flash('Geçersiz işlem.', 'error')
+    conn.commit()
+    return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))

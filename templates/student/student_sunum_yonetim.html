@@ -1,0 +1,260 @@
+{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    {# ===== BAŞLIK ===== #}
+    <div class="bg-white p-8 rounded-3xl shadow-xl border-b-8 border-blue-600">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+                <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
+                    Sunum Yönetim Paneli — {{ topic.HaftaNo }}. Hafta · {{ topic.OgretimTuru }}
+                </p>
+                <h1 class="text-3xl font-black text-gray-800 tracking-tighter leading-tight">{{ topic.KonuAdi }}</h1>
+                {% if topic.SunumTarihi %}
+                <p class="text-xs text-gray-500 font-bold mt-2">
+                    <i class="fa-regular fa-calendar mr-1"></i>{{ topic.SunumTarihi.strftime('%d.%m.%Y') }}
+                </p>
+                {% endif %}
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ url_for('student.student_topic_detail', sunum_id=topic.SunumID) }}"
+                   class="text-xs font-black text-blue-600 hover:text-blue-800 transition flex items-center gap-1.5 px-3 py-2 bg-blue-50 rounded-xl">
+                    <i class="fa-solid fa-eye"></i> Konu Detayı
+                </a>
+                <a href="{{ url_for('student.student_panel') }}"
+                   class="text-xs font-black text-gray-400 hover:text-gray-600 transition flex items-center gap-1.5 px-3 py-2">
+                    <i class="fa-solid fa-arrow-left"></i> Panele Dön
+                </a>
+            </div>
+        </div>
+
+        {% if atananlar %}
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Sunum Sahipleri</p>
+            <div class="flex flex-wrap gap-2">
+                {% for a in atananlar %}
+                <span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 text-xs font-black px-3 py-1.5 rounded-lg border border-emerald-200">
+                    <i class="fa-solid fa-user"></i>{{ a.OgrenciNo }}{% if a.AdSoyad %} — {{ a.AdSoyad }}{% endif %}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {# ===== DOSYA YÜKLEME ===== #}
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+            <h2 class="text-xs font-black text-gray-400 uppercase mb-4 tracking-widest border-b border-gray-100 pb-2">
+                <i class="fa-solid fa-cloud-arrow-up mr-1 text-blue-400"></i>Sunum Dosyaları
+            </h2>
+
+            <form method="POST" action="{{ url_for('student.student_sunum_dosya_yukle', sunum_id=topic.SunumID) }}"
+                  enctype="multipart/form-data" class="space-y-3 mb-5">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Dosya Tipi</label>
+                    <select name="dosya_tipi" required
+                            class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-400 bg-gray-50">
+                        <option value="sunum">Sunum (PPT/PDF)</option>
+                        <option value="demo">Demo (Video / Kaynak Kod)</option>
+                        <option value="kaynak">Kaynak / Ek Materyal</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Dosya</label>
+                    <input type="file" name="dosya" required
+                           class="w-full text-sm font-bold file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-blue-100 file:text-blue-700 file:font-black file:text-xs hover:file:bg-blue-200 transition">
+                    <p class="text-[10px] text-gray-400 font-bold mt-1">
+                        Maks {{ max_size_mb }} MB · İzinli: {{ allowed_extensions|join(', ') }}
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Açıklama <span class="text-gray-300">(opsiyonel)</span></label>
+                    <input type="text" name="aciklama" maxlength="200" placeholder="Örn: Demo videosu — 5dk"
+                           class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-sm outline-none focus:border-blue-400 bg-gray-50">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow-md">
+                    <i class="fa-solid fa-upload mr-2"></i>Yükle
+                </button>
+            </form>
+
+            {# Yüklenmiş dosyalar #}
+            {% if dosyalar %}
+            <div class="space-y-2">
+                {% for d in dosyalar %}
+                {% set tip_color = {'sunum':'blue','demo':'purple','kaynak':'amber'}.get(d.DosyaTipi, 'gray') %}
+                <div class="flex items-center justify-between p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-white transition">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded
+                                bg-{{ tip_color }}-100 text-{{ tip_color }}-700">{{ d.DosyaTipi }}</span>
+                            <span class="text-sm font-black text-gray-800 truncate">{{ d.DosyaAdi }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[10px] text-gray-400 font-bold">
+                            <span><i class="fa-regular fa-clock"></i> {{ d.YuklemeTarihi.strftime('%d.%m.%Y %H:%M') if d.YuklemeTarihi else '--' }}</span>
+                            {% if d.DosyaBoyutu %}<span>{{ (d.DosyaBoyutu / 1024 / 1024) | round(2) }} MB</span>{% endif %}
+                            {% if d.YukleyenNo %}<span><i class="fa-solid fa-user"></i> {{ d.YukleyenNo }}</span>{% endif %}
+                        </div>
+                        {% if d.Aciklama %}<p class="text-xs text-gray-500 mt-1 italic">{{ d.Aciklama }}</p>{% endif %}
+                    </div>
+                    <div class="flex gap-1 ml-3">
+                        <a href="{{ url_for('student.student_sunum_dosya_indir', dosya_id=d.DosyaID) }}"
+                           class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-black px-3 py-1.5 rounded-lg transition" title="İndir">
+                            <i class="fa-solid fa-download"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('student.student_sunum_dosya_sil', dosya_id=d.DosyaID) }}"
+                              onsubmit="return confirm('Bu dosya silinsin mi?');" class="inline">
+                            <button type="submit" class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-black px-3 py-1.5 rounded-lg transition" title="Sil">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-300 italic font-bold text-sm text-center py-6">Henüz dosya yüklenmedi.</p>
+            {% endif %}
+        </div>
+
+        {# ===== SORU ONAYLARI ===== #}
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+            <div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+                <h2 class="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    <i class="fa-solid fa-circle-question mr-1 text-purple-400"></i>Soru Soranlar
+                </h2>
+                <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-1 rounded-lg">
+                    {{ sorular|selectattr('SunanOnayi')|list|length }} / {{ sorular|length }} onay
+                </span>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+                <p class="text-[11px] text-blue-700 font-bold leading-relaxed">
+                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    Soruyu gerçekten soran öğrencileri <span class="font-black">onaylayın</span>, sormayanları <span class="font-black">reddedin</span>.
+                    Kontrolcü hakem olarak nihai kararı verir.
+                </p>
+            </div>
+
+            {% if sorular %}
+            <div class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                {% for s in sorular %}
+                <div class="p-3 rounded-xl border-2 transition
+                    {% if s.SunanOnayi == True %}bg-emerald-50 border-emerald-300
+                    {% elif s.SunanOnayi == False %}bg-red-50 border-red-300
+                    {% else %}bg-amber-50 border-amber-200{% endif %}">
+
+                    <div class="flex items-center justify-between mb-2">
+                        <a href="{{ url_for('student.student_profile', student_no=s.OgrenciNo) }}"
+                           class="font-black text-sm text-gray-800 hover:underline">
+                            {{ s.OgrenciNo }}{% if s.AdSoyad %} — {{ s.AdSoyad }}{% endif %}
+                        </a>
+                        <div class="flex gap-1">
+                            {# Sunum sahibi onay durumu #}
+                            {% if s.SunanOnayi == True %}
+                                <span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">
+                                    <i class="fa-solid fa-check"></i> Sunan
+                                </span>
+                            {% elif s.SunanOnayi == False %}
+                                <span class="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">
+                                    <i class="fa-solid fa-xmark"></i> Sunan
+                                </span>
+                            {% else %}
+                                <span class="bg-amber-400 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">
+                                    <i class="fa-solid fa-clock"></i> Bekliyor
+                                </span>
+                            {% endif %}
+                            {# Kontrolcü onay durumu #}
+                            {% if s.IsApproved %}
+                                <span class="bg-blue-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">
+                                    <i class="fa-solid fa-gavel"></i> Hakem
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if s.SoruIcerigi %}
+                    <div class="bg-white/60 border border-gray-200 rounded-lg p-2 mb-2">
+                        <p class="text-xs text-gray-700 font-medium leading-relaxed whitespace-pre-line">{{ s.SoruIcerigi }}</p>
+                    </div>
+                    {% else %}
+                    <p class="text-[10px] text-gray-400 italic font-bold mb-2">— Soru metni belirtilmemiş —</p>
+                    {% endif %}
+
+                    {% if s.SunanRedSebep %}
+                    <p class="text-[10px] text-red-600 font-bold mb-2"><i class="fa-solid fa-circle-exclamation mr-1"></i>{{ s.SunanRedSebep }}</p>
+                    {% endif %}
+
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-200/60">
+                        <span class="text-[10px] font-mono text-gray-400">
+                            {{ s.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if s.ZamanDamgasi else '--' }}
+                        </span>
+                        <div class="flex gap-1">
+                            {% if s.SunanOnayi != True %}
+                            <form method="POST" action="{{ url_for('student.student_sunum_soru_onay', sunum_id=topic.SunumID, basvuru_id=s.SoruBasvuruID) }}" class="inline">
+                                <input type="hidden" name="action" value="approve">
+                                <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-2.5 py-1 rounded transition" title="Onayla">
+                                    <i class="fa-solid fa-check"></i> Onay
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% if s.SunanOnayi != False %}
+                            <button type="button" onclick="openRejectModal({{ s.SoruBasvuruID }})"
+                                    class="bg-red-600 hover:bg-red-700 text-white text-[10px] font-black px-2.5 py-1 rounded transition" title="Reddet">
+                                <i class="fa-solid fa-xmark"></i> Red
+                            </button>
+                            {% endif %}
+                            {% if s.SunanOnayi is not none %}
+                            <form method="POST" action="{{ url_for('student.student_sunum_soru_onay', sunum_id=topic.SunumID, basvuru_id=s.SoruBasvuruID) }}" class="inline">
+                                <input type="hidden" name="action" value="reset">
+                                <button type="submit" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-[10px] font-black px-2.5 py-1 rounded transition" title="Sıfırla">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-300 italic font-bold text-sm text-center py-6">Henüz soru başvurusu yapılmadı.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ===== RED SEBEBİ MODAL ===== #}
+<div id="rejectModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-black text-gray-800 mb-3">Soruyu Reddet</h3>
+        <form id="rejectForm" method="POST">
+            <input type="hidden" name="action" value="reject">
+            <label class="block text-xs font-black text-gray-500 uppercase mb-2">Red sebebi (opsiyonel)</label>
+            <textarea name="reject_reason" rows="3" maxlength="255" placeholder="Örn: Soruyu o öğrenci sormadı."
+                      class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-medium text-sm outline-none focus:border-red-400 bg-gray-50"></textarea>
+            <div class="flex gap-2 mt-4">
+                <button type="button" onclick="closeRejectModal()"
+                        class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-xl font-black text-sm">
+                    İptal
+                </button>
+                <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-xl font-black text-sm">
+                    Reddet
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRejectModal(basvuruId) {
+    document.getElementById('rejectForm').action =
+        "{{ url_for('student.student_sunum_soru_onay', sunum_id=topic.SunumID, basvuru_id=0) }}".replace('/0', '/' + basvuruId);
+    document.getElementById('rejectModal').classList.remove('hidden');
+}
+function closeRejectModal() {
+    document.getElementById('rejectModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

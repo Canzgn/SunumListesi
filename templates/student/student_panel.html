@@ -10,6 +10,10 @@
                 <p class="text-[10px] font-black text-emerald-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-circle-check mr-1"></i>Sunum Atamanız Onaylandı</p>
                 <p class="font-black text-gray-800 text-sm truncate">{{ my_assignment.KonuAdi }}</p>
                 <p class="text-xs text-emerald-600 font-bold">{{ my_assignment.HaftaNo }}. Hafta</p>
+                <a href="{{ url_for('student.student_sunum_yonetim', sunum_id=my_assignment.SunumID) }}"
+                   class="inline-flex items-center gap-1.5 mt-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black px-3 py-1.5 rounded-lg transition shadow-sm">
+                    <i class="fa-solid fa-cog"></i> Sunum Yönetim Paneli
+                </a>
             {% else %}
                 <p class="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-hourglass-half mr-1"></i>Henüz Sunum Ataması Yapılmadı</p>
                 <p class="text-xs text-gray-500 font-bold">Konu başvurusu yaptıysanız atama sonucunu buradan görebilirsiniz.</p>

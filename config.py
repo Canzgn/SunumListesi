@@ -34,6 +34,14 @@ class Config:
     # Upload
     UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'kimlikler')
 
+    # Sunum dosyaları (sunum/demo/kaynak) için ayrı boyut limiti
+    SUNUM_MAX_FILE_SIZE = int(os.environ.get('SUNUM_MAX_FILE_SIZE', 25 * 1024 * 1024))  # 25 MB
+
+    # Supabase Storage – ayarlanmazsa yerel diske düşer
+    SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+    SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
+    SUPABASE_BUCKET = os.environ.get('SUPABASE_BUCKET', 'sunumlar')
+
     @classmethod
     def validate(cls):
         """Kritik ayarların varlığını doğrula. Eksikse çalışmayı durdur."""

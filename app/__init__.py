@@ -25,6 +25,12 @@ def create_app(config_class=Config):
     app.secret_key = app.config['SECRET_KEY']
     app.permanent_session_lifetime = timedelta(hours=app.config.get('PERMANENT_SESSION_LIFETIME_HOURS', 4))
 
+    # MAX_CONTENT_LENGTH'i sunum dosyalarına göre yükselt (kimlik fotosu yine 5MB akışında doğrulanır)
+    app.config['MAX_CONTENT_LENGTH'] = max(
+        app.config.get('MAX_CONTENT_LENGTH', 5 * 1024 * 1024),
+        app.config.get('SUNUM_MAX_FILE_SIZE', 25 * 1024 * 1024)
+    )
+
     # --- Extension'ları başlat ---
     from app.extensions import mail
     mail.init_app(app)
