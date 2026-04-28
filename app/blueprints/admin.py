@@ -476,6 +476,8 @@ def admin_assign():
 @admin_required
 def admin_questions():
     sort_order = request.args.get('sort', 'desc')
+    tur_filter = request.args.get('tur', '')
+    hafta_filter = request.args.get('hafta', '')
     order_sql = "ASC" if sort_order == 'asc' else "DESC"
 
     admin_bolum_ids = get_admin_bolum_ids()
@@ -483,7 +485,17 @@ def admin_questions():
     cursor = conn.cursor()
 
     bolum_filter = "AND sp.BolumID = ANY(%s)" if admin_bolum_ids else ""
-    params = (admin_bolum_ids,) if admin_bolum_ids else ()
+    tur_sql = "AND sp.OgretimTuru = %s" if tur_filter else ""
+    hafta_sql = "AND sp.HaftaNo = %s" if hafta_filter else ""
+
+    params = []
+    if admin_bolum_ids:
+        params.append(admin_bolum_ids)
+    if tur_filter:
+        params.append(tur_filter)
+    if hafta_filter:
+        params.append(int(hafta_filter))
+
     cursor.execute(f"""
         WITH ranked AS (
             SELECT SoruBasvuruID,
@@ -500,11 +512,20 @@ def admin_questions():
         JOIN SunumProgrami sp ON sb.SunumID = sp.SunumID
         JOIN Konular k ON sp.KonuID = k.KonuID
         LEFT JOIN Ogrenciler o ON sb.OgrenciNo = o.OgrenciNo
-        WHERE 1=1 {bolum_filter}
+        WHERE 1=1 {bolum_filter} {tur_sql} {hafta_sql}
         ORDER BY sb.ZamanDamgasi {order_sql}
-    """, params)
+    """, params if params else None)
     applications = cursor.fetchall()
-    return render_template('admin/admin_questions.html', applications=applications, current_sort=sort_order)
+
+    cursor.execute("SELECT DISTINCT sp.HaftaNo FROM SunumProgrami sp ORDER BY sp.HaftaNo")
+    hafta_listesi = [r.HaftaNo for r in cursor.fetchall()]
+
+    return render_template('admin/admin_questions.html',
+                           applications=applications,
+                           current_sort=sort_order,
+                           tur_filter=tur_filter,
+                           hafta_filter=hafta_filter,
+                           hafta_listesi=hafta_listesi)
 
 
 @admin_bp.route('/soru_approve/<int:basvuru_id>', methods=['POST'])

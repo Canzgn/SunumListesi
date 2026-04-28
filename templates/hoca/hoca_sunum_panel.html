@@ -112,9 +112,38 @@
         </div>
     </div>
 
+    {# ===== TATİL VE TAKVİM DIŞI UYARILARI ===== #}
+    {% if tatil_cadisi_sayisi > 0 or takvim_disi_sayisi > 0 %}
+    <div class="space-y-2">
+        {% if tatil_cadisi_sayisi > 0 %}
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-red-700">{{ tatil_cadisi_sayisi }} sunum tatil gününe denk geliyor</p>
+                    <p class="text-xs text-red-500">Hafta yönetiminden domino kaydırma uygulayın.</p>
+                </div>
+            </div>
+            <a href="{{ url_for('hoca.hoca_hafta_yonetimi') }}"
+               class="shrink-0 bg-red-600 hover:bg-red-700 text-white text-xs font-black px-4 py-2 rounded-xl transition">
+                Hafta Yönetimi →
+            </a>
+        </div>
+        {% endif %}
+        {% if takvim_disi_sayisi > 0 %}
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+            <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
+            <div>
+                <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
+                <p class="text-xs text-amber-600">Öğrenci ve idareyi bilgilendirin.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {# ===== TOPLU İŞLEM BUTONLARI ===== #}
-    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-        <div class="flex flex-wrap gap-3">
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">        <div class="flex flex-wrap gap-3">
             <form action="/admin/auto_assign" method="POST">
                 <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
                 <button type="submit"

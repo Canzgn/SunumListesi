@@ -234,7 +234,8 @@ def hoca_sunum_panel():
 
     if not bolumler:
         return render_template('hoca/hoca_sunum_panel.html', schedule_data=[], bolumler=[],
-                               secili_bolum=None, secili_bolum_id='')
+                               secili_bolum=None, secili_bolum_id='',
+                               tatil_cadisi_sayisi=0, takvim_disi_sayisi=0)
 
     secili_bolum_id = request.args.get('bolum_id', '')
     if not secili_bolum_id:
@@ -254,13 +255,100 @@ def hoca_sunum_panel():
 
     if not slot_ids:
         return render_template('hoca/hoca_sunum_panel.html', schedule_data=[], bolumler=bolumler,
-                               secili_bolum=secili_bolum, secili_bolum_id=secili_bolum_id)
+                               secili_bolum=secili_bolum, secili_bolum_id=secili_bolum_id,
+                               tatil_cadisi_sayisi=0, takvim_disi_sayisi=0)
 
     schedule_data = build_schedule_data(slot_ids, slots)
 
+    # Tatil ve takvim dışı uyarı sayıları
+    cursor.execute("""
+        SELECT COUNT(*) FROM SunumProgrami sp
+        JOIN TatilGunleri tg ON sp.sunumtarihi = tg.tarih
+        JOIN Bolumler b ON b.bolumid = sp.bolumid
+        WHERE b.donemid = tg.donemid AND sp.bolumid = %s
+    """, (secili_bolum_id,))
+    tatil_cadisi_sayisi = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM SunumProgrami sp
+        JOIN Bolumler b ON sp.bolumid = b.bolumid
+        JOIN Donemler d ON b.donemid = d.donemid
+        WHERE d.donembitis IS NOT NULL AND sp.sunumtarihi > d.donembitis
+          AND sp.sunumtarihi IS NOT NULL AND sp.bolumid = %s
+    """, (secili_bolum_id,))
+    takvim_disi_sayisi = cursor.fetchone()[0]
+
     return render_template('hoca/hoca_sunum_panel.html', schedule_data=schedule_data,
                            bolumler=bolumler, secili_bolum=secili_bolum,
-                           secili_bolum_id=secili_bolum_id)
+                           secili_bolum_id=secili_bolum_id,
+                           tatil_cadisi_sayisi=tatil_cadisi_sayisi,
+                           takvim_disi_sayisi=takvim_disi_sayisi)
+
+
+# --- Soru Seçim Kayıtları (konu bazlı) ---
+
+@hoca_bp.route('/soru_kayitlari')
+@hoca_required
+def hoca_soru_kayitlari():
+    from collections import defaultdict
+    hoca_id = session['hoca_id']
+    tur_filter = request.args.get('tur', '')
+    hafta_filter = request.args.get('hafta', '')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT b.BolumID FROM HocaBolumler hb
+        JOIN Bolumler b ON hb.BolumID = b.BolumID
+        WHERE hb.HocaID = %s
+    """, (hoca_id,))
+    bolum_ids = [r.BolumID for r in cursor.fetchall()]
+
+    if not bolum_ids:
+        return render_template('hoca/hoca_soru_kayitlari.html',
+                               grouped={}, hafta_listesi=[], tur_filter=tur_filter, hafta_filter=hafta_filter)
+
+    tur_sql = "AND sp.OgretimTuru = %s" if tur_filter else ""
+    hafta_sql = "AND sp.HaftaNo = %s" if hafta_filter else ""
+    params = [bolum_ids]
+    if tur_filter:
+        params.append(tur_filter)
+    if hafta_filter:
+        params.append(int(hafta_filter))
+
+    cursor.execute(f"""
+        SELECT sb.SoruBasvuruID, k.KonuAdi, sp.HaftaNo, sp.OgretimTuru,
+               sb.OgrenciNo, o.AdSoyad, sb.ZamanDamgasi,
+               sb.IsApproved, sb.SunanOnayi, sb.SoruIcerigi, sb.RejectReason, sp.SunumID
+        FROM SoruBasvurulari sb
+        JOIN SunumProgrami sp ON sb.SunumID = sp.SunumID
+        JOIN Konular k ON sp.KonuID = k.KonuID
+        LEFT JOIN Ogrenciler o ON sb.OgrenciNo = o.OgrenciNo
+        WHERE sp.BolumID = ANY(%s) {tur_sql} {hafta_sql}
+        ORDER BY sp.HaftaNo, k.KonuAdi, sb.ZamanDamgasi
+    """, params)
+    rows = cursor.fetchall()
+
+    grouped = defaultdict(lambda: {'konu': '', 'hafta': 0, 'tur': '', 'sunum_id': 0, 'kayitlar': []})
+    for r in rows:
+        key = r.SunumID
+        grouped[key]['konu'] = r.KonuAdi
+        grouped[key]['hafta'] = r.HaftaNo
+        grouped[key]['tur'] = r.OgretimTuru
+        grouped[key]['sunum_id'] = r.SunumID
+        grouped[key]['kayitlar'].append(r)
+
+    cursor.execute("""
+        SELECT DISTINCT sp.HaftaNo FROM SunumProgrami sp
+        WHERE sp.BolumID = ANY(%s) ORDER BY sp.HaftaNo
+    """, (bolum_ids,))
+    hafta_listesi = [r.HaftaNo for r in cursor.fetchall()]
+
+    return render_template('hoca/hoca_soru_kayitlari.html',
+                           grouped=dict(grouped),
+                           hafta_listesi=hafta_listesi,
+                           tur_filter=tur_filter,
+                           hafta_filter=hafta_filter)
 
 
 # --- Bölüm Ekle ---
