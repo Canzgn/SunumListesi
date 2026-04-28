@@ -147,27 +147,32 @@
                 <p class="text-[11px] text-blue-700 font-bold leading-relaxed">
                     <i class="fa-solid fa-circle-info mr-1"></i>
                     Sunum sırasında hangi öğrencinin <span class="font-black">hangi soruyu sorduğunu</span> aşağıdaki kutuya yazıp <span class="font-black">"Kaydet & Onayla"</span> ile onaylayabilirsiniz.
-                    Sormayanları <span class="font-black">reddedin</span>. Kontrolcü hakem olarak nihai kararı verir.
+                    Sormayanlara <span class="font-black">red</span> verebilirsiniz.
                 </p>
             </div>
 
             {# Manuel kayıt ekleme #}
-            {% set soru_sayisi = sorular|length %}
-            {% if soru_sayisi < 6 %}
+            {% set aktif_slot_sayisi = sorular | selectattr('pozisyon', 'ne', none) | list | length %}
+            {% if aktif_slot_sayisi < 6 %}
             <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-4">
                 <p class="text-[9px] font-black text-purple-500 uppercase tracking-widest mb-2">
-                    <i class="fa-solid fa-user-plus mr-1"></i>Kayıtsız Soru Soranı Ekle
-                    <span class="ml-1 text-gray-400">({{ soru_sayisi }}/6 kayıt)</span>
+                    <i class="fa-solid fa-user-plus mr-1"></i>Kayıtsız Soru Soranları Ekle
+                    <span class="ml-1 text-gray-400">({{ aktif_slot_sayisi }}/6 aktif slot dolu)</span>
                 </p>
+                {% if eklenebilir_ogrenciler %}
                 <form method="POST" action="{{ url_for('student.student_sunum_soru_manuel_ekle', sunum_id=topic.SunumID) }}" class="space-y-2">
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 items-start">
                         <div class="flex-1">
-                            <input type="text" name="ogrenci_no" required maxlength="20"
-                                   placeholder="Öğrenci numarası (örn: 20221234)"
-                                   class="w-full px-3 py-2 border-2 border-purple-200 rounded-xl font-bold text-sm outline-none focus:border-purple-400 bg-white">
+                            <select name="ogrenci_no" id="ogr-select" required
+                                    class="w-full" placeholder="Öğrenci seçin...">
+                                <option value=""></option>
+                                {% for o in eklenebilir_ogrenciler %}
+                                <option value="{{ o.OgrenciNo }}">{{ o.OgrenciNo }}{% if o.AdSoyad %} — {{ o.AdSoyad }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <button type="submit"
-                                class="shrink-0 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs px-4 py-2 rounded-xl transition shadow-sm">
+                                class="shrink-0 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs px-4 py-2 rounded-xl transition shadow-sm" style="margin-top:2px">
                             <i class="fa-solid fa-plus mr-1"></i>Ekle & Onayla
                         </button>
                     </div>
@@ -175,20 +180,25 @@
                               placeholder="Sorduğu soru (opsiyonel)..."
                               class="w-full px-3 py-2 border border-purple-200 rounded-xl font-medium text-sm outline-none focus:border-purple-400 bg-white resize-none"></textarea>
                 </form>
+                {% else %}
+                <p class="text-xs text-gray-400 italic">Bu öğretim türünde eklenebilecek kayıtlı öğrenci bulunamadı.</p>
+                {% endif %}
             </div>
             {% else %}
             <div class="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 mb-4 flex items-center gap-2">
                 <i class="fa-solid fa-lock text-orange-500 text-sm"></i>
-                <p class="text-[11px] text-orange-700 font-black">6/6 kayıt dolu. Yeni soru soranı eklemek için önce bir kaydı silin.</p>
+                <p class="text-[11px] text-orange-700 font-black">6/6 slot dolu (6 bekleyen/onaylanan talep). Yeni kişi eklemek için önce aşağıdaki ilk 6 kişiden birine <span class="underline">Red</span> basın.</p>
             </div>
             {% endif %}
 
             {% if sorular %}
             <div class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                 {% for s in sorular %}
+                {% set is_yedek = s.pozisyon is not none and s.pozisyon > 6 %}
                 <div class="p-3 rounded-xl border-2 transition
                     {% if s.SunanOnayi == True %}bg-emerald-50 border-emerald-300
                     {% elif s.SunanOnayi == False %}bg-red-50 border-red-300
+                    {% elif is_yedek %}bg-gray-50 border-gray-200
                     {% else %}bg-amber-50 border-amber-200{% endif %}">
 
                     <div class="flex items-center justify-between mb-2">
@@ -196,7 +206,19 @@
                            class="font-black text-sm text-gray-800 hover:underline">
                             {{ s.OgrenciNo }}{% if s.AdSoyad %} — {{ s.AdSoyad }}{% endif %}
                         </a>
-                        <div class="flex gap-1">
+                        <div class="flex gap-1 items-center flex-wrap justify-end">
+                            {# Pozisyon / slot bilgisi #}
+                            {% if s.SunanOnayi != false %}
+                                {% if s.pozisyon is not none and s.pozisyon <= 6 %}
+                                    <span class="bg-emerald-100 text-emerald-700 border border-emerald-300 text-[8px] font-black px-1.5 py-0.5 rounded">
+                                        <i class="fa-solid fa-bolt mr-0.5"></i>{{ s.pozisyon }}. sıra
+                                    </span>
+                                {% elif s.pozisyon is not none %}
+                                    <span class="bg-amber-100 text-amber-700 border border-amber-300 text-[8px] font-black px-1.5 py-0.5 rounded">
+                                        <i class="fa-solid fa-layer-group mr-0.5"></i>{{ s.pozisyon }}. sıra (Yedek)
+                                    </span>
+                                {% endif %}
+                            {% endif %}
                             {# Sunum sahibi onay durumu #}
                             {% if s.SunanOnayi == True %}
                                 <span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">
@@ -211,12 +233,7 @@
                                     <i class="fa-solid fa-clock"></i> Bekliyor
                                 </span>
                             {% endif %}
-                            {# Kontrolcü onay durumu #}
-                            {% if s.IsApproved %}
-                                <span class="bg-blue-500 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase">
-                                    <i class="fa-solid fa-gavel"></i> Hakem
-                                </span>
-                            {% endif %}
+                            {# Kontrolü onay durumu kaldırıldı #}
                         </div>
                     </div>
 
@@ -235,16 +252,29 @@
                                 <i class="fa-solid fa-floppy-disk"></i> Metni Kaydet
                             </button>
                             {% if s.SunanOnayi != True %}
-                            <button type="submit" name="action" value="approve"
-                                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-2 py-1 rounded transition" title="Metni kaydet ve onayla">
-                                <i class="fa-solid fa-check"></i> Kaydet & Onayla
-                            </button>
+                                {% if not is_yedek %}
+                                <button type="submit" name="action" value="approve"
+                                        class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-2 py-1 rounded transition" title="Metni kaydet ve onayla">
+                                    <i class="fa-solid fa-check"></i> Kaydet &amp; Onayla
+                                </button>
+                                {% else %}
+                                <span class="text-[9px] text-amber-700 font-black px-2 py-1 bg-amber-50 border border-amber-200 rounded inline-flex items-center gap-1" title="Slot açılması gerekiyor">
+                                    <i class="fa-solid fa-lock"></i> Yedek — slot dolu
+                                </span>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </form>
 
                     {% if s.SunanRedSebep %}
                     <p class="text-[10px] text-red-600 font-bold mb-2"><i class="fa-solid fa-circle-exclamation mr-1"></i>{{ s.SunanRedSebep }}</p>
+                    {% endif %}
+
+                    {% if is_yedek and s.SunanOnayi != False %}
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-hourglass-half text-amber-500 text-xs shrink-0"></i>
+                        <p class="text-[10px] text-amber-700 font-bold">İlk 6 slot dolu olduğu için bu kişi yedek sırada. Üstteki 6 kişiden birine <strong>Red</strong> basılırsa bu kişi otomatik aktif slota geçer.</p>
+                    </div>
                     {% endif %}
 
                     <div class="flex items-center justify-between pt-2 border-t border-gray-200/60">
@@ -309,5 +339,29 @@ function openRejectModal(basvuruId) {
 function closeRejectModal() {
     document.getElementById('rejectModal').classList.add('hidden');
 }
+</script>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.min.css">
+<style>
+/* Tom Select purple theme */
+.ts-wrapper.single .ts-control { border: 2px solid #e9d5ff; border-radius: 0.75rem; padding: 0.45rem 0.75rem; font-weight: 700; font-size: 0.875rem; background: #fff; box-shadow: none; }
+.ts-wrapper.single.focus .ts-control { border-color: #a855f7; box-shadow: none; }
+.ts-dropdown { border: 2px solid #e9d5ff; border-radius: 0.75rem; margin-top: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); overflow: hidden; }
+.ts-dropdown .option { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+.ts-dropdown .option:hover, .ts-dropdown .option.active { background: #f3e8ff; color: #7c3aed; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+(function() {
+    const el = document.getElementById('ogr-select');
+    if (!el) return;
+    new TomSelect(el, {
+        placeholder: 'Öğrenci seçin...',
+        allowEmptyOption: false,
+        maxOptions: null,
+        searchField: ['text', 'value'],
+    });
+})();
 </script>
 {% endblock %}

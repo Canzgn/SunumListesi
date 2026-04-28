@@ -33,7 +33,7 @@
                     {% endfor %}
                 </div>
                 <p class="text-xl font-black {% if my_soru_count > 0 %}text-purple-600{% else %}text-gray-400{% endif %}">{{ my_soru_count }}/3</p>
-                <p class="text-[9px] font-black text-gray-400 uppercase">Soru Hakkı</p>
+                <p class="text-[9px] font-black text-gray-400 uppercase">Aktif Soru Slotu</p>
             </div>
         </div>
     </div>
@@ -174,7 +174,7 @@
                 {% endif %}
                 {# Kaç soru tam onaylı / toplam #}
                 <span class="text-[9px] font-black text-gray-400 text-center" title="Tam onay (sunan + hakem) / toplam başvuru">
-                    <i class="fa-solid fa-comment text-gray-300 mr-0.5"></i>{{ sunum.SoruOzet.tam_onayli }} / {{ sunum.SoruOzet.toplam }} soru
+                    <i class="fa-solid fa-comment text-gray-300 mr-0.5"></i>{{ sunum.SoruOzet.sunan_onayli }} / {{ sunum.SoruOzet.toplam }} soru
                 </span>
             </div>
         </div>

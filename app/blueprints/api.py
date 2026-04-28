@@ -25,6 +25,56 @@ def api_student_lookup():
     return {'found': False}
 
 
+@api_bp.route('/search_students')
+@login_required
+def api_search_students():
+    """Öğrenci numarası veya adına göre anlık arama (autocomplete için).
+    sunum_id verilirse: aynı OgretimTuru + sunum sahiplerini hariç tut."""
+    q = request.args.get('q', '').strip()
+    sunum_id = request.args.get('sunum_id', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    extra_filters = ""
+    params: list = [f'%{q}%', f'%{q}%']
+
+    if sunum_id:
+        # Aynı öğretim türünden öğrenciler — Bolumler üzerinden güvenli join
+        extra_filters += """
+            AND EXISTS (
+                SELECT 1 FROM Bolumler b
+                WHERE b.BolumID = o.BolumID
+                  AND b.OgretimTuru = (
+                      SELECT OgretimTuru FROM SunumProgrami WHERE SunumID = %s LIMIT 1
+                  )
+            )
+        """
+        params.append(sunum_id)
+        # Sunum sahiplerini hariç tut
+        extra_filters += """
+            AND o.OgrenciNo NOT IN (
+                SELECT o2.OgrenciNo FROM SunumGorevlileri sg
+                JOIN Ogrenciler o2 ON o2.OgrenciID = sg.OgrenciID
+                WHERE sg.SunumID = %s
+            )
+        """
+        params.append(sunum_id)
+
+    cursor.execute(f"""
+        SELECT o.OgrenciNo, o.AdSoyad
+        FROM Ogrenciler o
+        WHERE (o.OgrenciNo ILIKE %s OR o.AdSoyad ILIKE %s)
+          AND o.IsApproved = TRUE
+          {extra_filters}
+        ORDER BY o.OgrenciNo
+        LIMIT 10
+    """, params)
+    rows = cursor.fetchall()
+    return jsonify([{'no': r.OgrenciNo, 'ad': r.AdSoyad or ''} for r in rows])
+
+
 @api_bp.route('/bolum_ogrenciler')
 @login_required
 def api_bolum_ogrenciler():

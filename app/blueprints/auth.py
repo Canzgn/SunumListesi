@@ -57,17 +57,7 @@ def login():
             else:
                 flash("Giriş başarısız! Bilgiler hatalı veya öğretmen onayınız henüz verilmedi.")
         elif role == 'kontrolcu':
-            cursor.execute("SELECT KontrolcuID, Password, IsApproved, AdSoyad FROM SoruKontrolculeri WHERE Username=%s", (user,))
-            k = cursor.fetchone()
-            pw_ok = check_password_hash(k.Password, pw) if (k and k.Password) else check_password_hash(_dummy_hash, pw)
-            if k and k.IsApproved and pw_ok:
-                session.permanent = True
-                session['user_role'] = 'kontrolcu'
-                session['kontrolcu_id'] = k.KontrolcuID
-                session['kontrolcu_name'] = k.AdSoyad or user
-                return redirect(url_for('kontrolcu.kontrolcu_panel'))
-            else:
-                flash("Giriş başarısız! Bilgiler hatalı veya onayınız henüz verilmedi.")
+            flash("Soru kontrolcü rolü kaldırıldı. Lütfen öğrenci, admin veya öğretmen olarak giriş yapın.", 'error')
         elif role == 'student':
             cursor.execute("SELECT OgrenciID, OgrenciNo, AdSoyad, OgretimTuru, IsApproved, KimlikFoto, Password FROM Ogrenciler WHERE OgrenciNo=%s AND IsApproved=TRUE", (user,))
             student = cursor.fetchone()

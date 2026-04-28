@@ -456,10 +456,18 @@ def admin_questions():
     bolum_filter = "AND sp.BolumID = ANY(%s)" if admin_bolum_ids else ""
     params = (admin_bolum_ids,) if admin_bolum_ids else ()
     cursor.execute(f"""
+        WITH ranked AS (
+            SELECT SoruBasvuruID,
+                   ROW_NUMBER() OVER (PARTITION BY SunumID ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunanOnayi IS DISTINCT FROM FALSE
+        )
         SELECT sb.SoruBasvuruID, k.KonuAdi, sp.HaftaNo, sp.OgretimTuru,
                sb.OgrenciNo, o.AdSoyad, sb.ZamanDamgasi, sb.IsApproved, sb.RejectReason,
-               sp.SunumID
+               sb.SunanOnayi, sb.SoruIcerigi, sp.SunumID,
+               r.pozisyon
         FROM SoruBasvurulari sb
+        LEFT JOIN ranked r ON r.SoruBasvuruID = sb.SoruBasvuruID
         JOIN SunumProgrami sp ON sb.SunumID = sp.SunumID
         JOIN Konular k ON sp.KonuID = k.KonuID
         LEFT JOIN Ogrenciler o ON sb.OgrenciNo = o.OgrenciNo
@@ -468,6 +476,43 @@ def admin_questions():
     """, params)
     applications = cursor.fetchall()
     return render_template('admin/admin_questions.html', applications=applications, current_sort=sort_order)
+
+
+@admin_bp.route('/soru_approve/<int:basvuru_id>', methods=['POST'])
+@admin_required
+def admin_soru_approve(basvuru_id):
+    """Admin'in soru kaydını onaylaması veya reddetmesi (IsApproved)."""
+    action = request.form.get('action', 'approve')
+    reject_reason = (request.form.get('reject_reason') or '').strip() or 'Admin tarafından reddedildi.'
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT SoruBasvuruID, SunanOnayi FROM SoruBasvurulari WHERE SoruBasvuruID=%s", (basvuru_id,))
+    row = cursor.fetchone()
+    if not row:
+        abort(404)
+    if action == 'approve':
+        if row.SunanOnayi is not True:
+            flash('Sunan henüz onaylamadı. Admin onayı yalnızca sunan onayından sonra verilebilir.', 'error')
+            return redirect(request.referrer or url_for('admin.admin_questions'))
+        cursor.execute(
+            "UPDATE SoruBasvurulari SET IsApproved=TRUE, RejectReason=NULL WHERE SoruBasvuruID=%s",
+            (basvuru_id,)
+        )
+        flash('Soru kaydı onaylandı.')
+    elif action == 'reject':
+        cursor.execute(
+            "UPDATE SoruBasvurulari SET IsApproved=FALSE, RejectReason=%s WHERE SoruBasvuruID=%s",
+            (reject_reason[:255], basvuru_id)
+        )
+        flash('Soru kaydı reddedildi.')
+    else:  # reset
+        cursor.execute(
+            "UPDATE SoruBasvurulari SET IsApproved=NULL, RejectReason=NULL WHERE SoruBasvuruID=%s",
+            (basvuru_id,)
+        )
+        flash('Soru kaydı durumu sıfırlandı.')
+    conn.commit()
+    return redirect(request.referrer or url_for('admin.admin_questions'))
 
 
 @admin_bp.route('/all_applications')
@@ -535,7 +580,9 @@ def student_detail(student_no):
     assignment = cursor.fetchone()
 
     cursor.execute("""
-        SELECT k.KonuAdi, sp.HaftaNo, sb.ZamanDamgasi, sp.SunumID, sp.OgretimTuru, sb.IsApproved, sb.RejectReason
+        SELECT k.KonuAdi, sp.HaftaNo, sb.ZamanDamgasi, sp.SunumID, sp.OgretimTuru,
+               sb.IsApproved, sb.RejectReason,
+               sb.SunanOnayi, sb.SunanRedSebep, sb.SoruIcerigi
         FROM SoruBasvurulari sb
         JOIN SunumProgrami sp ON sb.SunumID = sp.SunumID
         JOIN Konular k ON sp.KonuID = k.KonuID
@@ -574,12 +621,20 @@ def admin_topic_detail(sunum_id):
     basvurular = cursor.fetchall()
 
     cursor.execute("""
-        SELECT sb.SoruBasvuruID, o.OgrenciNo, o.AdSoyad, sb.IsApproved, sb.ZamanDamgasi, sb.RejectReason
+        WITH ranked AS (
+            SELECT SoruBasvuruID,
+                   ROW_NUMBER() OVER (ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunumID = %s AND SunanOnayi IS DISTINCT FROM FALSE
+        )
+        SELECT sb.SoruBasvuruID, o.OgrenciNo, o.AdSoyad, sb.IsApproved, sb.ZamanDamgasi, sb.RejectReason,
+               sb.SunanOnayi, sb.SunanRedSebep, sb.SoruIcerigi, r.pozisyon
         FROM SoruBasvurulari sb
+        LEFT JOIN ranked r ON r.SoruBasvuruID = sb.SoruBasvuruID
         JOIN Ogrenciler o ON o.OgrenciNo = sb.OgrenciNo
         WHERE sb.SunumID = %s
         ORDER BY sb.ZamanDamgasi ASC
-    """, (sunum_id,))
+    """, (sunum_id, sunum_id))
     soru_soranlar = cursor.fetchall()
 
     return render_template('admin/admin_topic_detail.html', topic=topic, atananlar=atananlar,
@@ -606,6 +661,11 @@ def update_question_status():
             return redirect(url_for('admin.admin_panel'))
 
     if action == 'approve':
+        cursor.execute("SELECT SunanOnayi FROM SoruBasvurulari WHERE SoruBasvuruID = %s", (basvuru_id,))
+        sb_row = cursor.fetchone()
+        if not sb_row or sb_row.SunanOnayi is not True:
+            flash('Sunan henüz onaylamadı. Admin onayı yalnızca sunan onayından sonra verilebilir.', 'error')
+            return redirect(url_for('admin.admin_topic_detail', sunum_id=sunum_id))
         cursor.execute("UPDATE SoruBasvurulari SET IsApproved = TRUE, RejectReason = NULL WHERE SoruBasvuruID = %s", (basvuru_id,))
         flash("Soru hakkı tekrar verildi / Onaylandı.")
     elif action == 'reject':

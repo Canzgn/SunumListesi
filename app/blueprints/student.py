@@ -73,7 +73,17 @@ def student_panel():
     cursor.execute("SELECT COUNT(*) FROM KonuBasvurulari WHERE Ogrenci1No = %s OR Ogrenci2No = %s", (current_no, current_no))
     my_basvuru_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM SoruBasvurulari WHERE OgrenciNo = %s", (current_no,))
+    # Aktif slot sayısı: konu başına ilk 6 pozisyon (sunan tarafından reddedilmeyenler)
+    cursor.execute("""
+        WITH ranked AS (
+            SELECT OgrenciNo,
+                   ROW_NUMBER() OVER (PARTITION BY SunumID ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunanOnayi IS DISTINCT FROM FALSE
+        )
+        SELECT COUNT(*) FROM ranked
+        WHERE OgrenciNo = %s AND pozisyon <= 6
+    """, (current_no,))
     my_soru_count = cursor.fetchone()[0]
 
     cursor.execute("SELECT DISTINCT SunumID FROM KonuBasvurulari WHERE Ogrenci1No = %s OR Ogrenci2No = %s",
@@ -112,13 +122,21 @@ def student_topic_detail(sunum_id):
     basvurular = cursor.fetchall()
 
     cursor.execute("""
+        WITH ranked AS (
+            SELECT SoruBasvuruID,
+                   ROW_NUMBER() OVER (ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunumID = %s AND SunanOnayi IS DISTINCT FROM FALSE
+        )
         SELECT sb.SoruBasvuruID, o.OgrenciNo, o.AdSoyad, sb.IsApproved, sb.ZamanDamgasi, sb.RejectReason,
-               sb.SoruIcerigi, sb.SunanOnayi, sb.SunanOnayTarihi, sb.SunanRedSebep
+               sb.SoruIcerigi, sb.SunanOnayi, sb.SunanOnayTarihi, sb.SunanRedSebep,
+               r.pozisyon
         FROM SoruBasvurulari sb
+        LEFT JOIN ranked r ON r.SoruBasvuruID = sb.SoruBasvuruID
         JOIN Ogrenciler o ON o.OgrenciNo = sb.OgrenciNo
         WHERE sb.SunumID = %s
         ORDER BY sb.ZamanDamgasi ASC
-    """, (sunum_id,))
+    """, (sunum_id, sunum_id))
     soru_soranlar = cursor.fetchall()
 
     current_no = session.get('student_no')
@@ -174,9 +192,19 @@ def student_questions():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT sb.SoruBasvuruID, sb.OgrenciNo, o.AdSoyad, sb.ZamanDamgasi, sb.IsApproved, sb.RejectReason,
-               k.KonuAdi, sp.HaftaNo, sp.SunumID
+        WITH ranked AS (
+            SELECT SoruBasvuruID,
+                   ROW_NUMBER() OVER (PARTITION BY SunumID ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunanOnayi IS DISTINCT FROM FALSE
+        )
+        SELECT sb.SoruBasvuruID, sb.OgrenciNo, o.AdSoyad, sb.ZamanDamgasi,
+               sb.IsApproved, sb.RejectReason, sb.SunanOnayi, sb.SunanRedSebep,
+               sb.SoruIcerigi, sb.SunanOnayTarihi,
+               k.KonuAdi, sp.HaftaNo, sp.SunumID,
+               r.pozisyon
         FROM SoruBasvurulari sb
+        LEFT JOIN ranked r ON r.SoruBasvuruID = sb.SoruBasvuruID
         JOIN Ogrenciler o ON sb.OgrenciNo = o.OgrenciNo
         JOIN SunumProgrami sp ON sb.SunumID = sp.SunumID
         JOIN Konular k ON sp.KonuID = k.KonuID
@@ -184,7 +212,8 @@ def student_questions():
         ORDER BY sb.ZamanDamgasi ASC
     """, (current_no,))
     questions = cursor.fetchall()
-    return render_template('student/student_questions.html', questions=questions)
+    active_soru_count = sum(1 for q in questions if q.pozisyon is not None and q.pozisyon <= 6)
+    return render_template('student/student_questions.html', questions=questions, active_soru_count=active_soru_count)
 
 
 @student_bp.route('/profile/<student_no>')
@@ -221,7 +250,8 @@ def student_profile(student_no):
     assignment = cursor.fetchone()
 
     cursor.execute("""
-        SELECT k.KonuAdi, sp.HaftaNo, sb.ZamanDamgasi, sp.SunumID, sp.OgretimTuru, sb.IsApproved, sb.RejectReason
+        SELECT k.KonuAdi, sp.HaftaNo, sb.ZamanDamgasi, sp.SunumID, sp.OgretimTuru,
+               sb.IsApproved, sb.RejectReason, sb.SunanOnayi, sb.SunanRedSebep, sb.SoruIcerigi
         FROM SoruBasvurulari sb
         JOIN SunumProgrami sp ON sb.SunumID = sp.SunumID
         JOIN Konular k ON sp.KonuID = k.KonuID
@@ -319,19 +349,6 @@ def student_apply_question():
         flash("Kendi sunum konunuza soru başvurusu yapamazsınız!", "error")
         return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
 
-    cursor.execute("SELECT COUNT(*) FROM SoruBasvurulari WHERE OgrenciNo = %s", (current_no,))
-    soru_count = cursor.fetchone()[0]
-    if soru_count >= 3:
-        flash("3 soru hakkınızı kullandınız. Yeni başvuru yapamazsınız.", "error")
-        return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
-
-    # Sunum başına 6 kayıt limiti
-    cursor.execute("SELECT COUNT(*) FROM SoruBasvurulari WHERE SunumID = %s", (sunum_id,))
-    sunum_soru_count = cursor.fetchone()[0]
-    if sunum_soru_count >= 6:
-        flash("Bu sunum için 6 soru kaydı dolu. Yeni başvuru yapılamaz.", "error")
-        return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
-
     soru_icerigi = (request.form.get('soru_icerigi') or '').strip() or None
     if soru_icerigi and len(soru_icerigi) > 2000:
         soru_icerigi = soru_icerigi[:2000]
@@ -342,7 +359,26 @@ def student_apply_question():
         VALUES (%s, %s, %s, %s)
     """, (sunum_id, current_no, now_str, soru_icerigi))
     conn.commit()
-    flash(f"Soru başvurunuz alındı! ({soru_count + 1}/3 soru hakkı kullanıldı)")
+    # Yeni pozisyonu hesapla
+    cursor.execute("""
+        WITH ranked AS (
+            SELECT SoruBasvuruID,
+                   ROW_NUMBER() OVER (ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunumID = %s AND SunanOnayi IS DISTINCT FROM FALSE
+        )
+        SELECT r.pozisyon FROM ranked r
+        JOIN SoruBasvurulari sb ON sb.SoruBasvuruID = r.SoruBasvuruID
+        WHERE sb.SunumID = %s AND sb.OgrenciNo = %s
+    """, (sunum_id, sunum_id, current_no))
+    pos_row = cursor.fetchone()
+    pozisyon = pos_row[0] if pos_row else None
+    if pozisyon and pozisyon <= 6:
+        flash(f"Soru başvurunuz alındı! Sıranız: {pozisyon}. — Aktif slot (ilk 6'da yer aldınız).")
+    elif pozisyon:
+        flash(f"Soru başvurunuz alındı! Sıranız: {pozisyon}. — Yedek konumundasınız (6'dan fazla talep var).")
+    else:
+        flash("Soru başvurunuz alındı.")
     return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
 
 
@@ -485,19 +521,50 @@ def student_sunum_yonetim(sunum_id):
     dosyalar = cursor.fetchall()
 
     cursor.execute("""
+        WITH ranked AS (
+            SELECT SoruBasvuruID,
+                   ROW_NUMBER() OVER (ORDER BY ZamanDamgasi ASC) AS pozisyon
+            FROM SoruBasvurulari
+            WHERE SunumID = %s AND SunanOnayi IS DISTINCT FROM FALSE
+        )
         SELECT sb.SoruBasvuruID, sb.OgrenciNo, o.AdSoyad, sb.SoruIcerigi,
                sb.SunanOnayi, sb.SunanOnayTarihi, sb.SunanRedSebep,
-               sb.IsApproved, sb.RejectReason, sb.ZamanDamgasi
+               sb.IsApproved, sb.RejectReason, sb.ZamanDamgasi,
+               r.pozisyon
         FROM SoruBasvurulari sb
+        LEFT JOIN ranked r ON r.SoruBasvuruID = sb.SoruBasvuruID
         LEFT JOIN Ogrenciler o ON o.OgrenciNo = sb.OgrenciNo
         WHERE sb.SunumID = %s
         ORDER BY (sb.SunanOnayi IS NULL) DESC, sb.ZamanDamgasi ASC
-    """, (sunum_id,))
+    """, (sunum_id, sunum_id))
     sorular = cursor.fetchall()
+
+    # Manuel ekle combobox için:
+    # - Sunan değil
+    # - Bu konuya HİÇ soru kaydı yok (varsa zaten listede onaylanır)
+    # - Aynı öğretim türü (Ogrenciler.OgretimTuru → boşsa Bolumler.OgretimTuru fallback)
+    cursor.execute("""
+        SELECT o.OgrenciNo, o.AdSoyad
+        FROM Ogrenciler o
+        LEFT JOIN Bolumler b ON b.BolumID = o.BolumID
+        WHERE LOWER(COALESCE(NULLIF(o.OgretimTuru, ''), b.OgretimTuru, '')) = LOWER(%s)
+          AND o.OgrenciNo NOT IN (
+              SELECT o2.OgrenciNo FROM SunumGorevlileri sg
+              JOIN Ogrenciler o2 ON o2.OgrenciID = sg.OgrenciID
+              WHERE sg.SunumID = %s
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM SoruBasvurulari sb
+              WHERE sb.SunumID = %s AND sb.OgrenciNo = o.OgrenciNo
+          )
+        ORDER BY o.OgrenciNo
+    """, (topic.OgretimTuru, sunum_id, sunum_id))
+    eklenebilir_ogrenciler = cursor.fetchall()
 
     return render_template('student/student_sunum_yonetim.html',
                            topic=topic, atananlar=atananlar,
                            dosyalar=dosyalar, sorular=sorular,
+                           eklenebilir_ogrenciler=eklenebilir_ogrenciler,
                            allowed_extensions=sorted(ALLOWED_SUNUM_EXTENSIONS),
                            max_size_mb=current_app.config.get('SUNUM_MAX_FILE_SIZE', 25 * 1024 * 1024) // (1024 * 1024))
 
@@ -705,12 +772,12 @@ def student_sunum_soru_manuel_ekle(sunum_id):
     if not _is_sunan(cursor, sunum_id, current_no):
         abort(403)
 
-    # 6 kayıt limiti
-    cursor.execute("SELECT COUNT(*) FROM SoruBasvurulari WHERE SunumID=%s", (sunum_id,))
-    mevcut = cursor.fetchone()[0]
-    if mevcut >= 6:
-        flash('Bu sunum için zaten 6 soru kaydı var. Yeni kayıt eklenemiyor.', 'error')
-        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+    # Aktif slot sayısı: reddedilmeyenler (NULL veya TRUE) = ilk 6 slot
+    cursor.execute("""
+        SELECT COUNT(*) FROM SoruBasvurulari
+        WHERE SunumID=%s AND SunanOnayi IS DISTINCT FROM FALSE
+    """, (sunum_id,))
+    aktif_slot = cursor.fetchone()[0]
 
     ogrenci_no = (request.form.get('ogrenci_no') or '').strip()
     soru_icerigi = (request.form.get('soru_icerigi') or '').strip()[:2000] or None
@@ -720,11 +787,26 @@ def student_sunum_soru_manuel_ekle(sunum_id):
         return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
 
     # Öğrenci sisteme kayıtlı mı?
-    cursor.execute("SELECT OgrenciNo, AdSoyad FROM Ogrenciler WHERE OgrenciNo=%s", (ogrenci_no,))
+    cursor.execute("SELECT OgrenciNo, AdSoyad, BolumID FROM Ogrenciler WHERE OgrenciNo=%s", (ogrenci_no,))
     ogr = cursor.fetchone()
     if not ogr:
         flash(f'{ogrenci_no} numaralı öğrenci sistemde kayıtlı değil.', 'error')
         return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    # Öğretim türü eşleşiyor mu? (Bolumler üzerinden kontrol)
+    cursor.execute("""
+        SELECT sp.OgretimTuru AS sunum_tur, b.OgretimTuru AS ogr_tur
+        FROM SunumProgrami sp
+        LEFT JOIN Bolumler b ON b.BolumID = %s
+        WHERE sp.SunumID = %s
+    """, (ogr.BolumID, sunum_id))
+    tur_row = cursor.fetchone()
+    if tur_row and tur_row.ogr_tur and tur_row.sunum_tur:
+        if tur_row.ogr_tur.lower() != tur_row.sunum_tur.lower():
+            flash(
+                f'{ogr.AdSoyad or ogrenci_no} öğrencisi "{tur_row.ogr_tur}" öğrencisi. '
+                f'Bu sunum "{tur_row.sunum_tur}" öğretimine ait — farklı öğretim türlerinden öğrenci eklenemez.', 'error')
+            return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
 
     # Kendi kendini ekleme yasağı (sunanlar)
     cursor.execute("""
@@ -736,19 +818,46 @@ def student_sunum_soru_manuel_ekle(sunum_id):
         flash('Sunum sahipleri soru kaydı yapamaz.', 'error')
         return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
 
-    # Zaten kayıtlı mı?
-    cursor.execute("SELECT 1 FROM SoruBasvurulari WHERE SunumID=%s AND OgrenciNo=%s", (sunum_id, ogrenci_no))
-    if cursor.fetchone():
-        flash(f'{ogrenci_no} bu sunum için zaten soru kaydına sahip.', 'error')
-        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
-
+    # Zaten kayıtlı mı? — Kayıtlıysa pozisyonu kontrol et, değilse slot bak
+    cursor.execute("SELECT SoruBasvuruID FROM SoruBasvurulari WHERE SunumID=%s AND OgrenciNo=%s", (sunum_id, ogrenci_no))
+    mevcut = cursor.fetchone()
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cursor.execute("""
-        INSERT INTO SoruBasvurulari (SunumID, OgrenciNo, ZamanDamgasi, SoruIcerigi, SunanOnayi, SunanOnayTarihi)
-        VALUES (%s, %s, %s, %s, TRUE, %s)
-    """, (sunum_id, ogrenci_no, now_str, soru_icerigi, now_str))
+    if mevcut:
+        # Mevcut kaydın pozisyonu 7+ ise slot dolu demektir
+        cursor.execute("""
+            WITH ranked AS (
+                SELECT SoruBasvuruID,
+                       ROW_NUMBER() OVER (ORDER BY ZamanDamgasi ASC) AS pozisyon
+                FROM SoruBasvurulari
+                WHERE SunumID=%s AND SunanOnayi IS DISTINCT FROM FALSE
+            )
+            SELECT pozisyon FROM ranked WHERE SoruBasvuruID=%s
+        """, (sunum_id, mevcut.SoruBasvuruID))
+        pos_row = cursor.fetchone()
+        if pos_row and pos_row[0] > 6:
+            flash(
+                f'{ogr.AdSoyad or ogrenci_no} şu an {pos_row[0]}. sırada (yedek). '
+                'Önce ilk 6 içinden birine red basarak slot açmanız gerekiyor.', 'error')
+            return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+        cursor.execute("""
+            UPDATE SoruBasvurulari SET SunanOnayi=TRUE, SunanRedSebep=NULL,
+                   SunanOnayTarihi=%s, SoruIcerigi=COALESCE(%s, SoruIcerigi)
+            WHERE SoruBasvuruID=%s
+        """, (now_str, soru_icerigi, mevcut.SoruBasvuruID))
+        flash(f"{ogr.AdSoyad or ogrenci_no} zaten kayıtlıydı — onaylandı.")
+    else:
+        # Yeni kişi: aktif slot dolu mu?
+        if aktif_slot >= 6:
+            flash(
+                'Tüm 6 slot dolu. '
+                'Yeni kişi eklemek için önce ilk 6 içinden birine red basarak slot açmanız gerekiyor.', 'error')
+            return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+        cursor.execute("""
+            INSERT INTO SoruBasvurulari (SunumID, OgrenciNo, ZamanDamgasi, SoruIcerigi, SunanOnayi, SunanOnayTarihi)
+            VALUES (%s, %s, %s, %s, TRUE, %s)
+        """, (sunum_id, ogrenci_no, now_str, soru_icerigi, now_str))
+        flash(f"{ogr.AdSoyad or ogrenci_no} soru soranlar listesine eklendi ve onaylandı.")
     conn.commit()
-    flash(f"{ogr.AdSoyad or ogrenci_no} soru soranlar listesine eklendi ve onaylandı.")
     return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
 
 
@@ -770,7 +879,23 @@ def student_sunum_soru_onay(sunum_id, basvuru_id):
 
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     if action == 'approve':
-        # Onayla — bu sırada metin güncellenebilir (sunum sahibi sorulan gerçek soruyu yazabilir)
+        # Yedek kontrolü: bu kişinin pozisyonu 6'dan büyükse blokla
+        cursor.execute("""
+            WITH ranked AS (
+                SELECT SoruBasvuruID,
+                       ROW_NUMBER() OVER (ORDER BY ZamanDamgasi ASC) AS pozisyon
+                FROM SoruBasvurulari
+                WHERE SunumID=%s AND SunanOnayi IS DISTINCT FROM FALSE
+            )
+            SELECT pozisyon FROM ranked WHERE SoruBasvuruID=%s
+        """, (sunum_id, basvuru_id))
+        pos_row = cursor.fetchone()
+        if pos_row and pos_row[0] > 6:
+            flash(
+                f'Bu kişi {pos_row[0]}. sırada (yedek konumda). '
+                'Onaylamak için önce ilk 6 içinden birine red basarak slot açmanız gerekiyor.', 'error')
+            return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+        # Onayla — bu sırada metin güncellenebilir
         soru_icerigi = (request.form.get('soru_icerigi') or '').strip()
         if soru_icerigi:
             soru_icerigi = soru_icerigi[:2000]

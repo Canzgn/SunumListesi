@@ -57,12 +57,7 @@
                 </div>
                 <h2 class="font-black text-gray-800 text-sm uppercase tracking-tighter line-clamp-1">{{ session.hoca_name }}</h2>
                 <p class="text-[10px] text-purple-500 font-bold">Öğretmen</p>
-            {% elif session.user_role == 'kontrolcu' %}
-                <div class="w-20 h-20 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-orange-400 p-1">
-                    <img src="https://ui-avatars.com/api/?name={{ session.kontrolcu_name }}&background=f97316&color=fff" alt="Kontrolcü" class="rounded-full">
-                </div>
-                <h2 class="font-black text-gray-800 text-sm uppercase tracking-tighter line-clamp-1">{{ session.kontrolcu_name }}</h2>
-                <p class="text-[10px] text-orange-500 font-bold">Soru Kontrolcüsü</p>
+
             {% else %}
                 <a href="/student/profile/{{ session.student_no }}" class="block group">
                     <div class="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden border-2 border-emerald-500 group-hover:border-emerald-700 transition p-1">
@@ -100,9 +95,7 @@
                 <a href="/admin/questions" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/questions' %}active{% endif %}">
                     <i class="fa-solid fa-question-circle w-6 text-center mr-2"></i> Soru Seçim Kayıtları
                 </a>
-                <a href="/hoca/kontrolcular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/kontrolcular' %}active{% endif %}">
-                    <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Kontrolcüleri
-                </a>
+
                 <a href="/mesaj/mesajlarim" class="nav-link flex items-center p-3 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/mesaj/mesajlarim' %}active{% endif %}">
                     <i class="fa-solid fa-envelope w-6 text-center mr-2"></i> Mesajlar
                     <span id="mesaj-badge-nav" class="ml-auto bg-indigo-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 hidden">0</span>
@@ -125,9 +118,6 @@
                 </a>
                 <a href="/hoca/sunum_panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/sunum_panel') %}active{% endif %}">
                     <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
-                </a>
-                <a href="/hoca/kontrolcular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/kontrolcular' %}active{% endif %}">
-                    <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Kontrolcüleri
                 </a>
                 <a href="/admin/manage_admins" class="nav-link flex items-center p-3 text-amber-700 rounded-xl transition font-bold text-sm {% if request.path == '/admin/manage_admins' %}active{% endif %}">
                     <i class="fa-solid fa-user-shield w-6 text-center mr-2"></i> Admin Yönetimi
@@ -162,13 +152,6 @@
                 </a>
                 <a href="/hoca/profil" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/profil' %}active{% endif %}">
                     <i class="fa-solid fa-id-badge w-6 text-center mr-2"></i> Profilim
-                </a>
-            {% elif session.user_role == 'kontrolcu' %}
-                <a href="/kontrolcu/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/kontrolcu/panel' %}active{% endif %}">
-                    <i class="fa-solid fa-clipboard-check w-6 text-center mr-2"></i> Soru Onay Paneli
-                </a>
-                <a href="/student/sunum/arsiv" class="nav-link flex items-center p-3 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/sunum/arsiv' %}active{% endif %}">
-                    <i class="fa-solid fa-folder-tree w-6 text-center mr-2"></i> Sunum Arşivi
                 </a>
             {% elif session.user_role == 'student' %}
                 <a href="/student/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/panel' %}active{% endif %}">
@@ -325,8 +308,7 @@
                 <form method="POST" action="/hoca/sifre_degistir" class="space-y-3">
             {% elif session.user_role == 'admin' %}
                 <form method="POST" action="/admin/sifre_degistir" class="space-y-3">
-            {% elif session.user_role == 'kontrolcu' %}
-                <form method="POST" action="/kontrolcu/sifre_degistir" class="space-y-3">
+
             {% elif session.user_role == 'student' %}
                 <form method="POST" action="/student/profile_edit" class="space-y-3">
                 <input type="hidden" name="action" value="change_password">

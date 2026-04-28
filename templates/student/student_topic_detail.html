@@ -83,13 +83,21 @@
                 <h2 class="text-xs font-black text-gray-400 uppercase tracking-widest">
                     <i class="fa-solid fa-comments mr-1 text-purple-400"></i>Soru Başvuruları
                 </h2>
+                {% set aktif_soranlar = soru_soranlar | selectattr('pozisyon', 'ne', none) | list %}
+                {% set aktif_slot_sayisi = aktif_soranlar | length %}
                 <span class="bg-purple-100 text-purple-800 text-[10px] font-black px-2 py-1 rounded-lg">
-                    {{ soru_soranlar|selectattr('IsApproved')|list|length }} Onaylı
+                    {{ aktif_slot_sayisi }}/6 Aktif Slot
                 </span>
             </div>
 
             {# Soru başvuru formu #}
-            {% if not my_question and not is_sunan %}
+            {% set aktif_soranlar2 = soru_soranlar | selectattr('pozisyon', 'ne', none) | list %}
+            {% if not my_question and not is_sunan and aktif_soranlar2|length >= 6 %}
+            <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-lock text-orange-500"></i>
+                <p class="text-xs text-orange-700 font-black">6/6 aktif slot dolu. </p>
+            </div>
+            {% elif not my_question and not is_sunan %}
             <form action="/student/apply_question" method="POST" class="mb-5">
                 <input type="hidden" name="sunum_id" value="{{ topic.SunumID }}">
                 <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-3">
@@ -105,7 +113,8 @@
                     <i class="fa-solid fa-question mr-2"></i>Soru Sormak İstiyorum (Kaydet)
                 </button>
             </form>
-            {% elif my_question %}
+            {% endif %}
+            {% if my_question %}
             <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center mb-4">
                 <i class="fa-solid fa-check-circle text-purple-500 mr-1"></i>
                 <span class="text-purple-700 font-black text-sm">Bu konuya soru hakkınızı kullandınız</span>
@@ -116,30 +125,27 @@
             {% if soru_soranlar %}
                 <div class="space-y-2 max-h-96 overflow-y-auto pr-1">
                     {% for s in soru_soranlar %}
+                    {% set is_yedek = s.pozisyon is not none and s.pozisyon > 6 %}
                     <div class="flex flex-col p-3 rounded-xl border transition
-                        {% if s.IsApproved and s.SunanOnayi %}bg-emerald-50 border-emerald-200
-                        {% elif s.RejectReason or s.SunanOnayi == False %}bg-red-50 border-red-200
-                        {% elif s.SunanOnayi == True %}bg-blue-50 border-blue-200
-                        {% else %}bg-gray-50 border-gray-200{% endif %}">
+                        {% if s.SunanOnayi == True %}bg-emerald-50 border-emerald-200
+                        {% elif s.SunanOnayi == False %}bg-red-50 border-red-200
+                        {% elif is_yedek %}bg-gray-50 border-gray-200
+                        {% else %}bg-amber-50 border-amber-200{% endif %}">
                         <div class="flex items-center justify-between gap-2 flex-wrap">
                             <a href="/student/profile/{{ s.OgrenciNo }}" class="font-black text-sm hover:underline
-                                {% if s.RejectReason or s.SunanOnayi == False %}text-red-700{% else %}text-gray-800{% endif %}">
+                                {% if s.SunanOnayi == False %}text-red-700{% else %}text-gray-800{% endif %}">
                                 {{ s.OgrenciNo }}{% if s.AdSoyad %} — {{ s.AdSoyad }}{% endif %}
                             </a>
                             <div class="flex gap-1">
                                 {# Sunum sahibi onayı #}
                                 {% if s.SunanOnayi == True %}
-                                    <span class="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Sunum sahibi onayladı"><i class="fa-solid fa-check"></i> Sunan</span>
+                                    <span class="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Sunum sahibi onayladı"><i class="fa-solid fa-check"></i> Sunan ✓</span>
                                 {% elif s.SunanOnayi == False %}
-                                    <span class="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Sunum sahibi reddetti"><i class="fa-solid fa-xmark"></i> Sunan</span>
+                                    <span class="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Sunum sahibi reddetti"><i class="fa-solid fa-xmark"></i> Sunan ✗</span>
+                                {% elif is_yedek %}
+                                    <span class="bg-gray-400 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Slot dolu, yedek sırasında"><i class="fa-solid fa-hourglass-half"></i> Yedek #{{ s.pozisyon }}</span>
                                 {% else %}
-                                    <span class="bg-amber-400 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Sunan onayı bekleniyor"><i class="fa-solid fa-clock"></i> Sunan</span>
-                                {% endif %}
-                                {# Kontrolcü onayı #}
-                                {% if s.IsApproved %}
-                                    <span class="bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Kontrolcü onayladı"><i class="fa-solid fa-gavel"></i> Hakem</span>
-                                {% elif s.RejectReason %}
-                                    <span class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Kontrolcü reddetti"><i class="fa-solid fa-ban"></i> Hakem</span>
+                                    <span class="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase" title="Aktif slot, sunan onayı bekleniyor"><i class="fa-solid fa-clock"></i> #{{ s.pozisyon }} Bekliyor</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -149,9 +155,7 @@
                         {% if s.SunanRedSebep %}
                         <p class="text-[10px] text-red-500 font-bold mt-1"><i class="fa-solid fa-circle-exclamation mr-1"></i>Sunan: {{ s.SunanRedSebep }}</p>
                         {% endif %}
-                        {% if s.RejectReason %}
-                        <p class="text-[10px] text-red-500 font-bold mt-1"><i class="fa-solid fa-gavel mr-1"></i>Kontrolcü: {{ s.RejectReason }}</p>
-                        {% endif %}
+
                         <span class="text-[10px] font-mono text-gray-400 mt-1">
                             {{ s.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if s.ZamanDamgasi else '--' }}
                         </span>

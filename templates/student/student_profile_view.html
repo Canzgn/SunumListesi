@@ -47,24 +47,52 @@
             {% if questions %}
                 <ul class="space-y-3">
                     {% for q in questions %}
-                        <li class="p-4 rounded-xl border {% if q.IsApproved %}bg-green-50 border-green-200{% elif q.RejectReason %}bg-red-50 border-red-200{% else %}bg-orange-50 border-orange-200{% endif %}">
-                            <div class="flex justify-between items-start mb-2">
+                    {% set sunan_ok = q.SunanOnayi == true %}
+                    {% set sunan_red = q.SunanOnayi == false %}
+                    {% set admin_ok = q.IsApproved == true %}
+                    {% set admin_red = q.IsApproved == false %}
+                        <li class="p-4 rounded-xl border
+                            {% if admin_ok %}bg-emerald-50 border-emerald-300
+                            {% elif admin_red %}bg-red-50 border-red-200
+                            {% elif sunan_ok %}bg-blue-50 border-blue-200
+                            {% elif sunan_red %}bg-red-50 border-red-200
+                            {% else %}bg-amber-50 border-amber-200{% endif %}">
+                            <div class="flex justify-between items-start mb-2 gap-2 flex-wrap">
                                 <h4 class="font-bold text-gray-800 text-sm"><a href="/student/topic/{{ q.SunumID }}" class="hover:underline text-indigo-600">{{ q.KonuAdi }}</a></h4>
-                                <span class="text-[10px] font-black px-2 py-1 rounded-full uppercase
-                                    {% if q.IsApproved %}bg-green-200 text-green-800
-                                    {% elif q.RejectReason %}bg-red-200 text-red-800
-                                    {% else %}bg-orange-200 text-orange-800{% endif %}">
-                                    {% if q.IsApproved %}Onaylandı
-                                    {% elif q.RejectReason %}Reddedildi/Geçersiz
-                                    {% else %}Beklemede{% endif %}
+                                {% if admin_ok %}
+                                    <span class="text-[10px] font-black px-2 py-1 rounded-full bg-emerald-200 text-emerald-800 uppercase shrink-0"><i class="fa-solid fa-check-double mr-1"></i>Tam Onaylı</span>
+                                {% elif admin_red %}
+                                    <span class="text-[10px] font-black px-2 py-1 rounded-full bg-red-200 text-red-800 uppercase shrink-0"><i class="fa-solid fa-ban mr-1"></i>Admin Reddetti</span>
+                                {% elif sunan_ok %}
+                                    <span class="text-[10px] font-black px-2 py-1 rounded-full bg-blue-200 text-blue-800 uppercase shrink-0"><i class="fa-solid fa-hourglass-half mr-1"></i>Admin Onayı Bekleniyor</span>
+                                {% elif sunan_red %}
+                                    <span class="text-[10px] font-black px-2 py-1 rounded-full bg-red-200 text-red-800 uppercase shrink-0"><i class="fa-solid fa-xmark mr-1"></i>Sunan Reddetti</span>
+                                {% else %}
+                                    <span class="text-[10px] font-black px-2 py-1 rounded-full bg-amber-200 text-amber-800 uppercase shrink-0"><i class="fa-solid fa-clock mr-1"></i>Beklemede</span>
+                                {% endif %}
+                            </div>
+                            {# Onay zinciri mini #}
+                            <div class="flex items-center gap-1.5 mb-2">
+                                <span class="text-[9px] font-black {% if sunan_ok %}text-emerald-600{% elif sunan_red %}text-red-500{% else %}text-gray-400{% endif %}">
+                                    {% if sunan_ok %}<i class="fa-solid fa-check"></i>{% elif sunan_red %}<i class="fa-solid fa-xmark"></i>{% else %}<i class="fa-solid fa-clock"></i>{% endif %} Sunan
+                                </span>
+                                <div class="w-6 h-0.5 {% if sunan_ok %}bg-emerald-300{% else %}bg-gray-200{% endif %} rounded"></div>
+                                <span class="text-[9px] font-black {% if admin_ok %}text-emerald-600{% elif admin_red %}text-red-500{% elif sunan_ok %}text-amber-600{% else %}text-gray-400{% endif %}">
+                                    {% if admin_ok %}<i class="fa-solid fa-check"></i>{% elif admin_red %}<i class="fa-solid fa-xmark"></i>{% elif sunan_ok %}<i class="fa-solid fa-hourglass text-[8px]"></i>{% else %}<i class="fa-solid fa-clock"></i>{% endif %} Admin
                                 </span>
                             </div>
+                            {% if q.SoruIcerigi %}
+                            <p class="text-xs text-indigo-700 italic bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5 mb-2 leading-relaxed">"{{ q.SoruIcerigi }}"</p>
+                            {% endif %}
                             <div class="text-xs text-gray-500 flex gap-3">
                                 <span><i class="fa-solid fa-calendar-day mr-1"></i> Hafta {{ q.HaftaNo }}</span>
                                 <span><i class="fa-regular fa-clock mr-1"></i> {{ q.ZamanDamgasi }}</span>
                             </div>
-                            {% if q.RejectReason %}
-                                <div class="mt-2 text-xs font-bold text-red-600 bg-red-100 p-2 rounded-lg"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Gerekçe: {{ q.RejectReason }}</div>
+                            {% if q.SunanRedSebep and sunan_red %}
+                                <div class="mt-2 text-xs font-bold text-red-600 bg-red-100 p-2 rounded-lg"><i class="fa-solid fa-circle-exclamation mr-1"></i> Sunan: {{ q.SunanRedSebep }}</div>
+                            {% endif %}
+                            {% if q.RejectReason and admin_red %}
+                                <div class="mt-2 text-xs font-bold text-red-600 bg-red-100 p-2 rounded-lg"><i class="fa-solid fa-ban mr-1"></i> Admin: {{ q.RejectReason }}</div>
                             {% endif %}
                         </li>
                     {% endfor %}

@@ -1,26 +1,31 @@
 ﻿{% extends "shared/layout.html" %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-4xl mx-auto">
     <div class="flex flex-col md:flex-row justify-between items-start mb-6 bg-white p-6 rounded-2xl shadow-lg border-b-4 border-emerald-600 gap-4">
         <div>
             <h1 class="text-3xl font-black text-gray-800 tracking-tighter uppercase">Soru Başvurularım</h1>
-            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Soru başvurularınızı ve onay durumlarını buradan takip edebilirsiniz (maksimum 3 hak).</p>
+            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">İlk 6 sıradaki başvurular aktif slot — konuya soru sormanız beklenir. 7. sıra ve sonrası yedektir.</p>
         </div>
         <div class="flex items-center gap-3">
-            {% set approved_count = questions | selectattr('IsApproved') | list | length %}
+            {% set admin_ok_count = questions | selectattr('IsApproved', 'equalto', true) | list | length %}
             {% set total_count = questions | list | length %}
-            <div class="flex gap-1.5 items-center">
-                {% for i in range(3) %}
-                    {% if i < approved_count %}
-                        <span class="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-black shadow"><i class="fa-solid fa-check text-[9px]"></i></span>
-                    {% elif i < total_count %}
-                        <span class="w-7 h-7 rounded-full bg-orange-400 flex items-center justify-center text-white text-xs font-black shadow"><i class="fa-solid fa-clock text-[9px]"></i></span>
-                    {% else %}
-                        <span class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs font-black">{{ i+1 }}</span>
-                    {% endif %}
-                {% endfor %}
-                <span class="text-xs font-black text-gray-400 ml-1">{{ total_count }}/3 Hak</span>
+            <div class="flex flex-col items-center gap-1">
+                <div class="flex items-center gap-1 justify-center">
+                    {% for i in range(3) %}
+                        {% if i < admin_ok_count %}
+                            <span class="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-black shadow" title="Tam onaylı"><i class="fa-solid fa-check text-[9px]"></i></span>
+                        {% elif i < active_soru_count %}
+                            <span class="w-7 h-7 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-black shadow" title="Aktif slot - onay bekleniyor"><i class="fa-solid fa-bolt text-[9px]"></i></span>
+                        {% else %}
+                            <span class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs font-black">{{ i+1 }}</span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <span class="text-[10px] font-black text-gray-400">{{ active_soru_count }}/3 Aktif Slot</span>
+                {% if total_count > active_soru_count %}
+                <span class="text-[9px] font-bold text-amber-500">+{{ total_count - active_soru_count }} yedek/iptal</span>
+                {% endif %}
             </div>
             <a href="/student/panel" class="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-xl font-black text-xs transition">
                 <i class="fa-solid fa-magnifying-glass"></i> Konulara Gözat
@@ -29,61 +34,167 @@
     </div>
 
     {% if questions %}
-    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-        <table class="w-full text-left">
-            <thead>
-                <tr class="bg-gray-800 text-white text-[10px] uppercase tracking-widest">
-                    <th class="p-4 font-black">Tarih</th>
-                    <th class="p-4 font-black">Hafta</th>
-                    <th class="p-4 font-black">Konu</th>
-                    <th class="p-4 font-black">Öğrenci No</th>
-                    <th class="p-4 font-black text-center">Durum</th>
-                    <th class="p-4 font-black text-center">İşlem</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for q in questions %}
-                <tr class="hover:bg-gray-50 transition">
-                    <td class="p-4 text-xs font-bold text-gray-500 whitespace-nowrap">
+    <div class="space-y-4">
+        {% for q in questions %}
+        {% set sunan_ok = q.SunanOnayi == true %}
+        {% set sunan_red = q.SunanOnayi == false %}
+        {% set admin_ok = q.IsApproved == true %}
+        {% set admin_red = q.IsApproved == false %}
+        {% set aktif = q.pozisyon is not none and q.pozisyon <= 6 %}
+        {% set yedek = q.pozisyon is not none and q.pozisyon > 6 %}
+
+        <div class="bg-white rounded-2xl shadow border overflow-hidden
+            {% if admin_ok %}border-emerald-400
+            {% elif admin_red %}border-red-300
+            {% elif sunan_ok %}border-blue-300
+            {% elif sunan_red %}border-red-200
+            {% elif yedek %}border-amber-300
+            {% else %}border-indigo-300{% endif %}">
+
+            {# Üst bar: renk göstergesi + genel durum #}
+            <div class="flex items-center justify-between px-4 pt-4 pb-2 gap-3 flex-wrap">
+                <div class="flex-1 min-w-0">
+                    <a href="/student/topic/{{ q.SunumID }}" class="font-black text-sm text-gray-800 hover:text-indigo-600 hover:underline transition block truncate">
+                        {{ q.KonuAdi }}
+                    </a>
+                    <p class="text-[10px] text-gray-400 font-bold mt-0.5">
+                        {{ q.HaftaNo }}. Hafta &bull;
                         {{ q.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if q.ZamanDamgasi else '--' }}
-                    </td>
-                    <td class="p-4 font-black text-gray-800 text-sm">{{ q.HaftaNo }}. Hafta</td>
-                    <td class="p-4 font-bold text-xs max-w-xs">
-                        <a href="/student/topic/{{ q.SunumID }}" class="text-indigo-600 hover:text-indigo-800 hover:underline transition leading-tight block">{{ q.KonuAdi }}</a>
-                    </td>
-                    <td class="p-4 text-xs">
-                        <a href="/student/profile/{{ q.OgrenciNo }}" class="font-mono text-emerald-600 font-bold hover:underline block">{{ q.OgrenciNo }}</a>
-                        <span class="text-gray-400 font-bold text-[10px]">{{ q.AdSoyad }}</span>
-                    </td>
-                    <td class="p-4 text-center">
-                        {% if q.IsApproved %}
-                            <span class="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase"><i class="fa-solid fa-check mr-1"></i>Onaylandı</span>
-                        {% elif q.RejectReason %}
-                            <div class="flex flex-col items-center gap-1">
-                                <span class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-black uppercase"><i class="fa-solid fa-xmark mr-1"></i>İptal</span>
-                                <span class="text-[9px] font-bold text-red-400">{{ q.RejectReason }}</span>
-                            </div>
-                        {% else %}
-                            <span class="px-3 py-1.5 rounded-lg bg-orange-100 text-orange-700 text-[10px] font-black uppercase"><i class="fa-solid fa-clock mr-1"></i>Beklemede</span>
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap justify-end shrink-0">
+                    {# Pozisyon / slot bilgisi #}
+                    {% if not sunan_red %}
+                        {% if aktif %}
+                            <span class="bg-emerald-100 text-emerald-700 border border-emerald-300 text-[9px] font-black px-2 py-0.5 rounded-full">
+                                <i class="fa-solid fa-bolt mr-0.5"></i>{{ q.pozisyon }}. sıra — Aktif
+                            </span>
+                        {% elif yedek %}
+                            <span class="bg-amber-100 text-amber-700 border border-amber-300 text-[9px] font-black px-2 py-0.5 rounded-full">
+                                <i class="fa-solid fa-hourglass-half mr-0.5"></i>{{ q.pozisyon }}. sıra — Yedek
+                            </span>
                         {% endif %}
-                    </td>
-                    <td class="p-4 text-center">
-                        {% if not q.IsApproved %}
-                        <form action="/student/delete_question/{{ q.SoruBasvuruID }}" method="POST"
-                            onsubmit="return confirm('Bu soru başvurusunu iptal etmek istediğinizden emin misiniz?')">
-                            <button type="submit"
-                                class="bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black px-3 py-1.5 rounded-lg transition border border-red-200">
-                                <i class="fa-solid fa-trash mr-1"></i>İptal Et
-                            </button>
-                        </form>
-                        {% else %}
-                            <span class="text-gray-300 text-[10px] font-bold">—</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endif %}
+
+                    {# Genel durum rozeti #}
+                    {% if admin_ok %}
+                        <span class="bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                            <i class="fa-solid fa-check-double mr-1"></i>Tam Onaylı
+                        </span>
+                    {% elif admin_red %}
+                        <span class="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                            <i class="fa-solid fa-ban mr-1"></i>Admin Reddetti
+                        </span>
+                    {% elif sunan_ok %}
+                        <span class="bg-blue-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                            <i class="fa-solid fa-hourglass-half mr-1"></i>Admin Onayı Bekleniyor
+                        </span>
+                    {% elif sunan_red %}
+                        <span class="bg-red-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                            <i class="fa-solid fa-xmark mr-1"></i>Sunan Reddetti
+                        </span>
+                    {% elif yedek %}
+                        <span class="bg-amber-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                            <i class="fa-solid fa-layer-group mr-1"></i>Yedek Konumda
+                        </span>
+                    {% else %}
+                        <span class="bg-indigo-400 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">
+                            <i class="fa-solid fa-clock mr-1"></i>Aktif — Onay Bekleniyor
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Onay zinciri çubuğu #}
+            <div class="flex items-center gap-2 px-4 pb-3">
+                {# Adım 1: Sunan #}
+                <div class="flex items-center gap-1.5">
+                    <div class="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black
+                        {% if sunan_ok %}bg-emerald-500 text-white{% elif sunan_red %}bg-red-500 text-white{% else %}bg-gray-200 text-gray-500{% endif %}">
+                        {% if sunan_ok %}<i class="fa-solid fa-check"></i>
+                        {% elif sunan_red %}<i class="fa-solid fa-xmark"></i>
+                        {% else %}1{% endif %}
+                    </div>
+                    <span class="text-[10px] font-black {% if sunan_ok %}text-emerald-600{% elif sunan_red %}text-red-500{% else %}text-gray-400{% endif %}">
+                        Sunan Onayı
+                    </span>
+                </div>
+                <div class="flex-1 h-0.5 {% if sunan_ok %}bg-emerald-300{% else %}bg-gray-200{% endif %} rounded"></div>
+                {# Adım 2: Admin #}
+                <div class="flex items-center gap-1.5">
+                    <div class="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black
+                        {% if admin_ok %}bg-emerald-500 text-white{% elif admin_red %}bg-red-500 text-white{% elif sunan_ok %}bg-amber-400 text-white{% else %}bg-gray-200 text-gray-500{% endif %}">
+                        {% if admin_ok %}<i class="fa-solid fa-check"></i>
+                        {% elif admin_red %}<i class="fa-solid fa-xmark"></i>
+                        {% elif sunan_ok %}<i class="fa-solid fa-hourglass text-[8px]"></i>
+                        {% else %}2{% endif %}
+                    </div>
+                    <span class="text-[10px] font-black {% if admin_ok %}text-emerald-600{% elif admin_red %}text-red-500{% elif sunan_ok %}text-amber-600{% else %}text-gray-400{% endif %}">
+                        Admin Onayı
+                    </span>
+                </div>
+            </div>
+
+            {# Kaydedilen soru içeriği #}
+            {% if q.SoruIcerigi %}
+            <div class="mx-4 mb-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                <p class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">
+                    <i class="fa-solid fa-quote-left mr-1"></i>Kaydedilen Soru
+                </p>
+                <p class="text-sm text-indigo-800 font-medium italic leading-relaxed">"{{ q.SoruIcerigi }}"</p>
+            </div>
+            {% elif sunan_ok %}
+            <div class="mx-4 mb-3 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                <p class="text-[10px] text-gray-400 italic"><i class="fa-solid fa-pen text-gray-300 mr-1"></i>Sunan henüz soru metnini kaydetmedi.</p>
+            </div>
+            {% endif %}
+
+            {# Ret sebepleri #}
+            {% if q.SunanRedSebep and sunan_red %}
+            <div class="mx-4 mb-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                <p class="text-[10px] text-red-600 font-bold"><i class="fa-solid fa-circle-exclamation mr-1"></i>Sunan: {{ q.SunanRedSebep }}</p>
+            </div>
+            {% endif %}
+            {% if q.RejectReason and admin_red %}
+            <div class="mx-4 mb-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                <p class="text-[10px] text-red-600 font-bold"><i class="fa-solid fa-ban mr-1"></i>Admin: {{ q.RejectReason }}</p>
+            </div>
+            {% endif %}
+
+            {# Alt işlem alanı — her durumda geri çekme izni #}
+            <div class="border-t border-gray-100 px-4 py-2.5 bg-gray-50 flex justify-end">
+                {% if admin_ok %}
+                {# Tam onaylı — çok güçlü uyarı #}
+                <form action="/student/delete_question/{{ q.SoruBasvuruID }}" method="POST"
+                    onsubmit="return confirm('⚠️ DİKKAT: Bu başvuru admin tarafından onaylandı.\n\n\"{{ q.KonuAdi }}\" konusuna soru sorma kaydınız tamamen silinecek.\n\nBu işlem geri alınamaz. Emin misiniz?')">
+                    <button type="submit"
+                        class="bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-black px-3 py-1.5 rounded-lg transition border border-red-300">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>Onaylı Başvuruyu Geri Çek
+                    </button>
+                </form>
+                {% elif sunan_ok %}
+                {# Sunan onayladı, admin bekliyor #}
+                <form action="/student/delete_question/{{ q.SoruBasvuruID }}" method="POST"
+                    onsubmit="return confirm('Bu başvuru sunum sahibi tarafından onaylandı ve admin onayı bekleniyor.\n\n\"{{ q.KonuAdi }}\" konusundan başvurunuzu geri çekmek istediğinize emin misiniz?')">
+                    <button type="submit"
+                        class="bg-orange-50 hover:bg-orange-100 text-orange-700 text-[10px] font-black px-3 py-1.5 rounded-lg transition border border-orange-200">
+                        <i class="fa-solid fa-rotate-left mr-1"></i>Başvuruyu Geri Çek
+                    </button>
+                </form>
+                {% else %}
+                {# Henüz onaylanmamış — normal iptal #}
+                <form action="/student/delete_question/{{ q.SoruBasvuruID }}" method="POST"
+                    onsubmit="return confirm('Bu soru başvurusunu iptal etmek istediğinizden emin misiniz?')">
+                    <button type="submit"
+                        class="bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black px-3 py-1.5 rounded-lg transition border border-red-200">
+                        <i class="fa-solid fa-trash mr-1"></i>Başvuruyu İptal Et
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
     </div>
     {% else %}
     <div class="bg-white rounded-3xl shadow-xl p-16 text-center border border-gray-100">

@@ -46,7 +46,6 @@ def create_app(config_class=Config):
     from app.blueprints.admin import admin_bp
     from app.blueprints.student import student_bp
     from app.blueprints.hoca import hoca_bp
-    from app.blueprints.kontrolcu import kontrolcu_bp
     from app.blueprints.api import api_bp
     from app.blueprints.export import export_bp
     from app.blueprints.duyuru import duyuru_bp
@@ -56,7 +55,6 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(student_bp, url_prefix='/student')
     app.register_blueprint(hoca_bp, url_prefix='/hoca')
-    app.register_blueprint(kontrolcu_bp, url_prefix='/kontrolcu')
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(export_bp)
     app.register_blueprint(duyuru_bp)
