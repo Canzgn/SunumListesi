@@ -854,12 +854,21 @@ def hoca_hafta_yonetimi():
 
     cursor.execute("SELECT KonuID, KonuAdi FROM Konular ORDER BY SiraNo, KonuAdi")
     tum_konular = cursor.fetchall()
+
+    # Vize haftaları dahil tüm haftaları sıralı listele (slotsuz vize haftaları da görünsün)
+    slots_by_week = {}
+    for s in slotlar:
+        slots_by_week.setdefault(s.HaftaNo, []).append(s)
+    all_hafta_nos = sorted(set(s.HaftaNo for s in slotlar) | vize_haftalari)
+    hafta_display = [(w, slots_by_week.get(w, [])) for w in all_hafta_nos]
+
     return render_template('hoca/hoca_hafta_yonetimi.html', bolumler=bolumler, slotlar=slotlar,
                            secili_bolum_id=bolum_id, tum_konular=tum_konular, tur=tur,
                            akademik_bitis=akademik_bitis, tatil_gunleri=tatil_gunleri,
                            tatil_tarihleri=tatil_tarihleri, tatil_cadisi=tatil_cadisi,
                            takvim_disi=takvim_disi,
-                           vize_haftalari=vize_haftalari, vize_records=vize_records)
+                           vize_haftalari=vize_haftalari, vize_records=vize_records,
+                           hafta_display=hafta_display)
 
 
 @hoca_bp.route('/sunum_hafta_guncelle', methods=['POST'])
