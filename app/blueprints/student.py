@@ -325,6 +325,13 @@ def student_apply_question():
         flash("3 soru hakkınızı kullandınız. Yeni başvuru yapamazsınız.", "error")
         return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
 
+    # Sunum başına 6 kayıt limiti
+    cursor.execute("SELECT COUNT(*) FROM SoruBasvurulari WHERE SunumID = %s", (sunum_id,))
+    sunum_soru_count = cursor.fetchone()[0]
+    if sunum_soru_count >= 6:
+        flash("Bu sunum için 6 soru kaydı dolu. Yeni başvuru yapılamaz.", "error")
+        return redirect(url_for('student.student_topic_detail', sunum_id=sunum_id))
+
     soru_icerigi = (request.form.get('soru_icerigi') or '').strip() or None
     if soru_icerigi and len(soru_icerigi) > 2000:
         soru_icerigi = soru_icerigi[:2000]
@@ -685,6 +692,64 @@ def sunum_arsivi():
                            donemler=donemler, bolumler=bolumler,
                            tip_dagilimi=tip_dagilimi,
                            f_donem=donem_id, f_bolum=bolum_id, f_tip=tip, f_q=q)
+
+
+@student_bp.route('/sunum/<int:sunum_id>/soru_manuel_ekle', methods=['POST'])
+@student_required
+def student_sunum_soru_manuel_ekle(sunum_id):
+    """Sunum sahibinin sistemde kayıtsız soru soranı manuel olarak eklemesi.
+    SunanOnayi otomatik TRUE (sunan bizzat eklediği için). Toplam limit: 6."""
+    current_no = session['student_no']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if not _is_sunan(cursor, sunum_id, current_no):
+        abort(403)
+
+    # 6 kayıt limiti
+    cursor.execute("SELECT COUNT(*) FROM SoruBasvurulari WHERE SunumID=%s", (sunum_id,))
+    mevcut = cursor.fetchone()[0]
+    if mevcut >= 6:
+        flash('Bu sunum için zaten 6 soru kaydı var. Yeni kayıt eklenemiyor.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    ogrenci_no = (request.form.get('ogrenci_no') or '').strip()
+    soru_icerigi = (request.form.get('soru_icerigi') or '').strip()[:2000] or None
+
+    if not ogrenci_no:
+        flash('Öğrenci numarası gerekli.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    # Öğrenci sisteme kayıtlı mı?
+    cursor.execute("SELECT OgrenciNo, AdSoyad FROM Ogrenciler WHERE OgrenciNo=%s", (ogrenci_no,))
+    ogr = cursor.fetchone()
+    if not ogr:
+        flash(f'{ogrenci_no} numaralı öğrenci sistemde kayıtlı değil.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    # Kendi kendini ekleme yasağı (sunanlar)
+    cursor.execute("""
+        SELECT 1 FROM SunumGorevlileri sg
+        JOIN Ogrenciler o ON o.OgrenciID = sg.OgrenciID
+        WHERE sg.SunumID=%s AND o.OgrenciNo=%s
+    """, (sunum_id, ogrenci_no))
+    if cursor.fetchone():
+        flash('Sunum sahipleri soru kaydı yapamaz.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    # Zaten kayıtlı mı?
+    cursor.execute("SELECT 1 FROM SoruBasvurulari WHERE SunumID=%s AND OgrenciNo=%s", (sunum_id, ogrenci_no))
+    if cursor.fetchone():
+        flash(f'{ogrenci_no} bu sunum için zaten soru kaydına sahip.', 'error')
+        return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
+
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cursor.execute("""
+        INSERT INTO SoruBasvurulari (SunumID, OgrenciNo, ZamanDamgasi, SoruIcerigi, SunanOnayi, SunanOnayTarihi)
+        VALUES (%s, %s, %s, %s, TRUE, %s)
+    """, (sunum_id, ogrenci_no, now_str, soru_icerigi, now_str))
+    conn.commit()
+    flash(f"{ogr.AdSoyad or ogrenci_no} soru soranlar listesine eklendi ve onaylandı.")
+    return redirect(url_for('student.student_sunum_yonetim', sunum_id=sunum_id))
 
 
 @student_bp.route('/sunum/<int:sunum_id>/soru_onay/<int:basvuru_id>', methods=['POST'])
