@@ -625,7 +625,7 @@ def sunum_arsivi():
     where_parts = []
     params = []
     if donem_id:
-        where_parts.append("sp.DonemID = %s"); params.append(donem_id)
+        where_parts.append("b.DonemID = %s"); params.append(donem_id)
     if bolum_id:
         where_parts.append("sp.BolumID = %s"); params.append(bolum_id)
     if tip in ('sunum', 'demo', 'kaynak'):
@@ -646,7 +646,7 @@ def sunum_arsivi():
         JOIN SunumProgrami sp ON sp.SunumID = d.SunumID
         JOIN Konular k ON k.KonuID = sp.KonuID
         LEFT JOIN Bolumler b ON b.BolumID = sp.BolumID
-        LEFT JOIN Donemler dn ON dn.DonemID = sp.DonemID
+        LEFT JOIN Donemler dn ON dn.DonemID = b.DonemID
         LEFT JOIN Ogrenciler o ON o.OgrenciID = d.YukleyenOgrenciID
         {where_sql}
         ORDER BY d.YuklemeTarihi DESC
@@ -668,11 +668,13 @@ def sunum_arsivi():
             ekipler.setdefault(r.SunumID, []).append(r)
 
     # Tip dağılımı (üst kart)
+    # Tip dağılımı (üst kart) — Bolumler join donem filtresi için gerekli
     cursor.execute(f"""
         SELECT d.DosyaTipi, COUNT(*) AS sayi
         FROM SunumDosyalari d
         JOIN SunumProgrami sp ON sp.SunumID = d.SunumID
         JOIN Konular k ON k.KonuID = sp.KonuID
+        LEFT JOIN Bolumler b ON b.BolumID = sp.BolumID
         {where_sql}
         GROUP BY d.DosyaTipi
     """, tuple(params))
@@ -703,12 +705,30 @@ def student_sunum_soru_onay(sunum_id, basvuru_id):
 
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     if action == 'approve':
-        cursor.execute("""
-            UPDATE SoruBasvurulari
-               SET SunanOnayi=TRUE, SunanRedSebep=NULL, SunanOnayTarihi=%s
-             WHERE SoruBasvuruID=%s
-        """, (now_str, basvuru_id))
+        # Onayla — bu sırada metin güncellenebilir (sunum sahibi sorulan gerçek soruyu yazabilir)
+        soru_icerigi = (request.form.get('soru_icerigi') or '').strip()
+        if soru_icerigi:
+            soru_icerigi = soru_icerigi[:2000]
+            cursor.execute("""
+                UPDATE SoruBasvurulari
+                   SET SunanOnayi=TRUE, SunanRedSebep=NULL, SunanOnayTarihi=%s,
+                       SoruIcerigi=%s
+                 WHERE SoruBasvuruID=%s
+            """, (now_str, soru_icerigi, basvuru_id))
+        else:
+            cursor.execute("""
+                UPDATE SoruBasvurulari
+                   SET SunanOnayi=TRUE, SunanRedSebep=NULL, SunanOnayTarihi=%s
+                 WHERE SoruBasvuruID=%s
+            """, (now_str, basvuru_id))
         flash('Soruyu onayladınız.')
+    elif action == 'edit_soru':
+        # Sadece soru metnini güncelle, onay durumuna dokunma
+        soru_icerigi = (request.form.get('soru_icerigi') or '').strip()[:2000] or None
+        cursor.execute("""
+            UPDATE SoruBasvurulari SET SoruIcerigi=%s WHERE SoruBasvuruID=%s
+        """, (soru_icerigi, basvuru_id))
+        flash('Soru metni güncellendi.')
     elif action == 'reject':
         cursor.execute("""
             UPDATE SoruBasvurulari
