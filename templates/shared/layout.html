@@ -31,6 +31,13 @@
         .dark .border-gray-100, .dark .border-gray-200 { border-color: #334155 !important; }
         .dark .bg-gray-50, .dark .bg-slate-50 { background-color: #334155 !important; }
         .dark .divide-gray-100 > * + * { border-color: #334155 !important; }
+        /* Sticky hafta başlıkları */
+        .week-header, [id^="hafta-"] { position: sticky; top: 0; z-index: 20; }
+        /* Collapsible nav groups */
+        .nav-group-body { max-height: 0; overflow: hidden; transition: max-height 0.28s ease; }
+        .nav-group-body.open { max-height: 500px; }
+        .nav-group-chevron { display: inline-block; transition: transform 0.25s; }
+        .nav-group-chevron.open { transform: rotate(180deg); }
     </style>
 </head>
 <body class="bg-gray-100 flex" id="body-root">
@@ -75,7 +82,45 @@
             {% endif %}
         </div>
 
-        <nav class="flex-1 p-4 space-y-2 mt-4">
+        <nav class="flex-1 p-4 space-y-1 mt-2" id="sidebar-nav">
+            {# ===== GLOBAL ARAMA ===== #}
+            <div class="relative mb-2">
+                <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] pointer-events-none"></i>
+                <input id="nav-search" type="text" placeholder="Menüde ara..." autocomplete="off"
+                    class="w-full pl-7 pr-7 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[11px] font-bold outline-none focus:border-blue-300 transition placeholder-gray-400">
+                <button onclick="clearNavSearch()" id="nav-search-clear"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 hidden">
+                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                </button>
+            </div>
+            {# ===== BİLDİRİM PANELİ ===== #}
+            <div class="mb-2" id="notif-wrapper">
+                <button onclick="toggleNotifDropdown()"
+                    class="w-full flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-black text-amber-800 transition">
+                    <i class="fa-solid fa-bell text-amber-500"></i>
+                    <span>Bildirimler</span>
+                    <span id="notif-total-badge" class="hidden ml-0.5 bg-red-500 text-white text-[10px] font-black rounded-full px-1.5 leading-5">0</span>
+                    <i class="fa-solid fa-chevron-down ml-auto text-amber-400 text-[10px] nav-group-chevron" id="notif-chevron"></i>
+                </button>
+                <div id="notif-dropdown" class="hidden mt-1 bg-white border border-gray-100 rounded-xl shadow-md overflow-hidden text-xs">
+                    {% if session.user_role in ['hoca', 'admin'] %}
+                    <a href="/mesaj/mesajlarim" class="flex items-center justify-between px-4 py-2.5 hover:bg-indigo-50 font-bold text-gray-700 border-b border-gray-100 transition">
+                        <span><i class="fa-solid fa-envelope mr-2 text-indigo-500"></i>Okunmamış Mesaj</span>
+                        <span id="notif-mesaj-count" class="hidden bg-indigo-100 text-indigo-700 font-black px-2 py-0.5 rounded-full">0</span>
+                    </a>
+                    {% else %}
+                    <a href="/student/mesaj_gonder" class="flex items-center justify-between px-4 py-2.5 hover:bg-indigo-50 font-bold text-gray-700 border-b border-gray-100 transition">
+                        <span><i class="fa-solid fa-paper-plane mr-2 text-indigo-500"></i>Mesajlarım</span>
+                    </a>
+                    {% endif %}
+                    <a href="{% if session.user_role == 'admin' %}/admin/duyurular{% else %}/student/duyurular{% endif %}"
+                        class="flex items-center justify-between px-4 py-2.5 hover:bg-amber-50 font-bold text-gray-700 transition">
+                        <span><i class="fa-solid fa-bullhorn mr-2 text-amber-500"></i>Duyurular</span>
+                        <span id="notif-duyuru-count" class="hidden bg-amber-100 text-amber-700 font-black px-2 py-0.5 rounded-full">0</span>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-gray-100 mb-1"></div>
             {% if session.user_role == 'admin' %}
                 <a href="/admin/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/admin/panel' %}active{% endif %}">
                     <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
@@ -114,38 +159,61 @@
                     <i class="fa-solid fa-calendar-week w-6 text-center mr-2"></i> Takvim Görünümü
                 </a>
             {% elif session.user_role == 'hoca' %}
+                {# ── ANA ── #}
                 <a href="/hoca/panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/panel' %}active{% endif %}">
                     <i class="fa-solid fa-layer-group w-6 text-center mr-2"></i> Genel Bakış
                 </a>
                 <a href="/hoca/sunum_panel" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/sunum_panel') %}active{% endif %}">
                     <i class="fa-solid fa-calendar-check w-6 text-center mr-2"></i> Sunum Paneli
                 </a>
-                <a href="/admin/manage_admins" class="nav-link flex items-center p-3 text-amber-700 rounded-xl transition font-bold text-sm {% if request.path == '/admin/manage_admins' %}active{% endif %}">
-                    <i class="fa-solid fa-user-shield w-6 text-center mr-2"></i> Admin Yönetimi
-                </a>
-                <a href="/hoca/ogrenciler?bolum_id={{ request.args.get('bolum_id', '') }}" class="nav-link flex items-center p-3 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/bolum/') and 'ogrenciler' in request.path %}active{% endif %}">
-                    <i class="fa-solid fa-users w-6 text-center mr-2"></i> Mevcut Öğrenciler
-                </a>
-                <a href="/hoca/bolum_ekle" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/bolum_ekle' %}active{% endif %}">
-                    <i class="fa-solid fa-plus-circle w-6 text-center mr-2"></i> Yeni Bölüm Ekle
-                </a>
-                <a href="/hoca/konular" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/konular' %}active{% endif %}">
-                    <i class="fa-solid fa-book w-6 text-center mr-2"></i> Konu Yönetimi
-                </a>
-                <a href="/hoca/hafta_yonetimi" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/hafta_yonetimi') %}active{% endif %}">
-                    <i class="fa-solid fa-calendar-days w-6 text-center mr-2"></i> Hafta Yönetimi
-                </a>
+                <div class="border-t border-gray-100 my-1"></div>
+                {# ── YÖNETİM (Collapsible) ── #}
+                <div class="nav-group" id="navgrp-yonetim" data-group-paths="/hoca/donemler,/hoca/ogretmen_ekle,/admin/manage_admins">
+                    <button onclick="toggleNavGroup('navgrp-yonetim')"
+                        class="w-full flex items-center gap-2 px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl transition font-black text-[11px] uppercase tracking-wider">
+                        <i class="fa-solid fa-gear w-5 text-center text-gray-400 text-xs"></i>
+                        <span>Yönetim</span>
+                        <i class="fa-solid fa-chevron-down ml-auto text-gray-300 text-[10px] nav-group-chevron" id="chevron-navgrp-yonetim"></i>
+                    </button>
+                    <div class="nav-group-body pl-3 space-y-0.5" id="body-navgrp-yonetim">
+                        <a href="/hoca/donemler" class="nav-link flex items-center p-2.5 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/donemler' %}active{% endif %}">
+                            <i class="fa-solid fa-box-archive w-6 text-center mr-2 text-xs"></i> Dönem Yönetimi
+                        </a>
+                        <a href="/hoca/ogretmen_ekle" class="nav-link flex items-center p-2.5 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/ogretmen_ekle' %}active{% endif %}">
+                            <i class="fa-solid fa-user-plus w-6 text-center mr-2 text-xs"></i> Öğretmen Ekle
+                        </a>
+                        <a href="/admin/manage_admins" class="nav-link flex items-center p-2.5 text-amber-700 rounded-xl transition font-bold text-sm {% if request.path == '/admin/manage_admins' %}active{% endif %}">
+                            <i class="fa-solid fa-user-shield w-6 text-center mr-2 text-xs"></i> Admin Yönetimi
+                        </a>
+                    </div>
+                </div>
+                {# ── İÇERİK & ÖĞRENCİLER (Collapsible) ── #}
+                <div class="nav-group" id="navgrp-icerik" data-group-paths="/hoca/konular,/hoca/hafta_yonetimi,/hoca/ogrenciler">
+                    <button onclick="toggleNavGroup('navgrp-icerik')"
+                        class="w-full flex items-center gap-2 px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-xl transition font-black text-[11px] uppercase tracking-wider">
+                        <i class="fa-solid fa-book-open w-5 text-center text-gray-400 text-xs"></i>
+                        <span>İçerik & Öğrenciler</span>
+                        <i class="fa-solid fa-chevron-down ml-auto text-gray-300 text-[10px] nav-group-chevron" id="chevron-navgrp-icerik"></i>
+                    </button>
+                    <div class="nav-group-body pl-3 space-y-0.5" id="body-navgrp-icerik">
+                        <a href="/hoca/konular" class="nav-link flex items-center p-2.5 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/konular' %}active{% endif %}">
+                            <i class="fa-solid fa-book w-6 text-center mr-2 text-xs"></i> Konu Yönetimi
+                        </a>
+                        <a href="/hoca/hafta_yonetimi" class="nav-link flex items-center p-2.5 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/hafta_yonetimi') %}active{% endif %}">
+                            <i class="fa-solid fa-calendar-days w-6 text-center mr-2 text-xs"></i> Hafta Yönetimi
+                        </a>
+                        <a href="/hoca/ogrenciler" class="nav-link flex items-center p-2.5 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/ogrenciler') or (request.path.startswith('/hoca/bolum/') and 'ogrenciler' in request.path) %}active{% endif %}">
+                            <i class="fa-solid fa-users w-6 text-center mr-2 text-xs"></i> Mevcut Öğrenciler
+                        </a>
+                    </div>
+                </div>
+                <div class="border-t border-gray-100 my-1"></div>
+                {# ── SABİT ── #}
                 <a href="/student/sunum/arsiv" class="nav-link flex items-center p-3 text-blue-600 rounded-xl transition font-bold text-sm {% if request.path == '/student/sunum/arsiv' %}active{% endif %}">
                     <i class="fa-solid fa-folder-tree w-6 text-center mr-2"></i> Sunum Arşivi
                 </a>
                 <a href="/hoca/takvim" class="nav-link flex items-center p-3 text-teal-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/takvim' %}active{% endif %}">
                     <i class="fa-solid fa-calendar-week w-6 text-center mr-2"></i> Takvim Görünümü
-                </a>
-                <a href="/hoca/donemler" class="nav-link flex items-center p-3 text-indigo-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/donemler' %}active{% endif %}">
-                    <i class="fa-solid fa-box-archive w-6 text-center mr-2"></i> Dönem Yönetimi
-                </a>
-                <a href="/hoca/ogretmen_ekle" class="nav-link flex items-center p-3 text-purple-600 rounded-xl transition font-bold text-sm {% if request.path == '/hoca/ogretmen_ekle' %}active{% endif %}">
-                    <i class="fa-solid fa-user-plus w-6 text-center mr-2"></i> Öğretmen Ekle
                 </a>
                 <a href="/hoca/soru_kayitlari" class="nav-link flex items-center p-3 text-gray-600 rounded-xl transition font-bold text-sm {% if request.path.startswith('/hoca/soru_kayitlari') %}active{% endif %}">
                     <i class="fa-solid fa-question-circle w-6 text-center mr-2"></i> Soru Seçim Kayıtları
@@ -269,33 +337,130 @@
             }
         })();
 
-        /* ---- Duyuru Badge (sayı gösterimi) ---- */
-        function escHtml(s) {
-            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        /* ---- Duyuru + Mesaj Badge & Bildirim Merkezi ---- */
+        function updateNotifTotal() {
+            let total = 0;
+            ['notif-mesaj-count', 'notif-duyuru-count'].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el && !el.classList.contains('hidden')) total += (parseInt(el.textContent) || 0);
+            });
+            const badge = document.getElementById('notif-total-badge');
+            if (badge) { badge.textContent = total; badge.classList.toggle('hidden', total === 0); }
         }
 
-        // Sayfa yüklenince badge güncelle
         fetch('/api/duyurular')
             .then(r => r.json())
             .then(data => {
                 if (data.length) {
                     const badge = document.getElementById('duyuru-badge');
                     if (badge) { badge.textContent = data.length; badge.classList.remove('hidden'); }
+                    const nc = document.getElementById('notif-duyuru-count');
+                    if (nc) { nc.textContent = data.length; nc.classList.remove('hidden'); }
+                    updateNotifTotal();
                 }
             }).catch(() => {});
 
-        /* ---- Mesaj Badge (okunmamış mesaj sayısı) ---- */
         {% if session.user_role in ['hoca', 'admin'] %}
         fetch('/mesaj/api/okunmamis_mesaj_sayisi')
             .then(r => r.json())
             .then(data => {
                 const badge = document.getElementById('mesaj-badge-nav');
-                if (badge && data.count > 0) {
-                    badge.textContent = data.count;
-                    badge.classList.remove('hidden');
+                if (badge && data.count > 0) { badge.textContent = data.count; badge.classList.remove('hidden'); }
+                if (data.count > 0) {
+                    const nc = document.getElementById('notif-mesaj-count');
+                    if (nc) { nc.textContent = data.count; nc.classList.remove('hidden'); }
+                    updateNotifTotal();
                 }
             }).catch(() => {});
         {% endif %}
+
+        /* ---- Bildirim Dropdown ---- */
+        function toggleNotifDropdown() {
+            const dd = document.getElementById('notif-dropdown');
+            const ch = document.getElementById('notif-chevron');
+            if (!dd) return;
+            const isHidden = dd.classList.toggle('hidden');
+            if (ch) ch.classList.toggle('open', !isHidden);
+        }
+        document.addEventListener('click', function(e) {
+            const w = document.getElementById('notif-wrapper');
+            if (w && !w.contains(e.target)) {
+                const dd = document.getElementById('notif-dropdown');
+                const ch = document.getElementById('notif-chevron');
+                if (dd && !dd.classList.contains('hidden')) {
+                    dd.classList.add('hidden');
+                    if (ch) ch.classList.remove('open');
+                }
+            }
+        });
+
+        /* ---- Global Nav Arama ---- */
+        const navSearchEl = document.getElementById('nav-search');
+        if (navSearchEl) {
+            navSearchEl.addEventListener('input', function() {
+                const q = this.value.trim().toLowerCase();
+                const clearBtn = document.getElementById('nav-search-clear');
+                if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+                // Grup dışı direkt linkler
+                document.querySelectorAll('#sidebar-nav > .nav-link').forEach(function(l) {
+                    l.style.display = (!q || l.textContent.trim().toLowerCase().includes(q)) ? '' : 'none';
+                });
+                // Separator div'leri her zaman göster
+                document.querySelectorAll('#sidebar-nav > .border-t').forEach(function(d) { d.style.display = ''; });
+                // Grup içi linkler
+                document.querySelectorAll('.nav-group').forEach(function(grp) {
+                    let anyVisible = false;
+                    grp.querySelectorAll('.nav-link').forEach(function(l) {
+                        const vis = !q || l.textContent.trim().toLowerCase().includes(q);
+                        l.style.display = vis ? '' : 'none';
+                        if (vis) anyVisible = true;
+                    });
+                    grp.style.display = (!q || anyVisible) ? '' : 'none';
+                    if (q && anyVisible) {
+                        const body = document.getElementById('body-' + grp.id);
+                        const chev = document.getElementById('chevron-' + grp.id);
+                        if (body) body.classList.add('open');
+                        if (chev) chev.classList.add('open');
+                    }
+                });
+                // Sayfadaki konu kartları (data-konu attribute'lu)
+                document.querySelectorAll('[data-konu]').forEach(function(el) {
+                    el.style.display = (!q || el.dataset.konu.toLowerCase().includes(q)) ? '' : 'none';
+                });
+            });
+        }
+        function clearNavSearch() {
+            const el = document.getElementById('nav-search');
+            if (el) { el.value = ''; el.dispatchEvent(new Event('input')); el.focus(); }
+        }
+
+        /* ---- Collapsible Nav Gruplar ---- */
+        function toggleNavGroup(id) {
+            const body = document.getElementById('body-' + id);
+            const chev = document.getElementById('chevron-' + id);
+            if (!body) return;
+            const isOpen = body.classList.toggle('open');
+            if (chev) chev.classList.toggle('open', isOpen);
+            try { sessionStorage.setItem('navgrp-' + id, isOpen ? '1' : '0'); } catch(e) {}
+        }
+        // Aktif sayfaya veya sessionStorage'a göre grubu otomatik aç
+        (function autoOpenGroups() {
+            const path = window.location.pathname;
+            document.querySelectorAll('.nav-group').forEach(function(grp) {
+                const id = grp.id;
+                if (!id) return;
+                const paths = (grp.dataset.groupPaths || '').split(',').map(function(p) { return p.trim(); });
+                const isActive = paths.some(function(p) { return p && path.startsWith(p); });
+                let stored = null;
+                try { stored = sessionStorage.getItem('navgrp-' + id); } catch(e) {}
+                if (isActive || stored === '1') {
+                    const body = document.getElementById('body-' + id);
+                    const chev = document.getElementById('chevron-' + id);
+                    if (body) body.classList.add('open');
+                    if (chev) chev.classList.add('open');
+                }
+            });
+        })();
     </script>
 
     <!-- ŞİFRE DEĞİŞTİR MODALI -->
