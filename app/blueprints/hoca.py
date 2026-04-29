@@ -297,15 +297,17 @@ def hoca_sunum_panel():
     """, (secili_bolum_id,))
     takvim_disi_sayisi = cursor.fetchone()[0]
 
-    cursor.execute("SELECT vizeid, haftano FROM VizeHaftalari WHERE bolumid = %s ORDER BY haftano", (secili_bolum_id,))
+    cursor.execute("SELECT vizeid, haftano, aciklama, islemyapan, hafta_tarihi FROM VizeHaftalari WHERE bolumid = %s ORDER BY haftano", (secili_bolum_id,))
     vize_rows = cursor.fetchall()
     vize_haftalar = {r.haftano for r in vize_rows}
     vize_records = vize_rows
+    vize_meta = {r.haftano: {'vizeid': r.vizeid, 'aciklama': r.aciklama, 'islemyapan': r.islemyapan, 'hafta_tarihi': r.hafta_tarihi} for r in vize_rows}
 
-    cursor.execute("SELECT tatilkaydiraid, haftano FROM TatilKaydirmaHaftalari WHERE bolumid = %s ORDER BY haftano", (secili_bolum_id,))
+    cursor.execute("SELECT tatilkaydiraid, haftano, aciklama, islemyapan, hafta_tarihi FROM TatilKaydirmaHaftalari WHERE bolumid = %s ORDER BY haftano", (secili_bolum_id,))
     tatilkaydir_rows = cursor.fetchall()
     tatilkaydir_haftalar = {r.haftano for r in tatilkaydir_rows}
     tatilkaydir_records = tatilkaydir_rows
+    tatilkaydir_meta = {r.haftano: {'tatilkaydiraid': r.tatilkaydiraid, 'aciklama': r.aciklama, 'islemyapan': r.islemyapan, 'hafta_tarihi': r.hafta_tarihi} for r in tatilkaydir_rows}
 
     cursor.execute("SELECT tarih FROM TatilGunleri ORDER BY tarih")
     tatil_tarihleri = [r.tarih for r in cursor.fetchall()]
@@ -350,13 +352,28 @@ def hoca_sunum_panel():
         })
     schedule_data.sort(key=lambda x: x['HaftaNo'])
 
+    # Hafta → tarih haritası (placeholder haftalara tarih göstermek için)
+    hafta_tarih_map = {}
+    for r in vize_rows:
+        if r.hafta_tarihi:
+            hafta_tarih_map[r.haftano] = r.hafta_tarihi
+    for r in tatilkaydir_rows:
+        if r.hafta_tarihi:
+            hafta_tarih_map[r.haftano] = r.hafta_tarihi
+    for s in schedule_data:
+        if s.get('SunumTarihi'):
+            hafta_tarih_map[s['HaftaNo']] = s['SunumTarihi']
+
     return render_template('hoca/hoca_sunum_panel.html', schedule_data=schedule_data,
                            bolumler=bolumler, secili_bolum=secili_bolum,
                            secili_bolum_id=secili_bolum_id,
                            tatil_cadisi_sayisi=tatil_cadisi_sayisi,
                            takvim_disi_sayisi=takvim_disi_sayisi,
                            vize_haftalar=vize_haftalar, vize_records=vize_records,
+                           vize_meta=vize_meta,
                            tatilkaydir_haftalar=tatilkaydir_haftalar, tatilkaydir_records=tatilkaydir_records,
+                           tatilkaydir_meta=tatilkaydir_meta,
+                           hafta_tarih_map=hafta_tarih_map,
                            tatil_tarihleri=tatil_tarihleri, akademik_bitis=akademik_bitis,
                            tum_konular=tum_konular, tatil_cadisi_haftalari=tatil_cadisi_haftalari,
                            tatil_gunleri=tatil_gunleri)
@@ -923,7 +940,7 @@ def hoca_hafta_yonetimi():
     vize_records = []
     if bolum_id:
         cursor.execute(
-            "SELECT vizeid, haftano FROM VizeHaftalari WHERE bolumid=%s ORDER BY haftano",
+            "SELECT vizeid, haftano, aciklama, islemyapan, hafta_tarihi FROM VizeHaftalari WHERE bolumid=%s ORDER BY haftano",
             (bolum_id,)
         )
         vize_records = cursor.fetchall()
@@ -933,7 +950,7 @@ def hoca_hafta_yonetimi():
     tatilkaydir_records = []
     if bolum_id:
         cursor.execute(
-            "SELECT tatilkaydiraid, haftano FROM TatilKaydirmaHaftalari WHERE bolumid=%s ORDER BY haftano",
+            "SELECT tatilkaydiraid, haftano, aciklama, islemyapan, hafta_tarihi FROM TatilKaydirmaHaftalari WHERE bolumid=%s ORDER BY haftano",
             (bolum_id,)
         )
         tatilkaydir_records = cursor.fetchall()
@@ -1226,6 +1243,10 @@ def hoca_vize_ekle():
         flash('Geçersiz parametreler.', 'error')
         return redirect(url_for('hoca.hoca_hafta_yonetimi'))
     hafta_no = int(hafta_no)
+    aciklama = request.form.get('aciklama', '').strip() or None
+    islemyapan = (session.get('hoca_name') or session.get('user_name') or 'Hoca')[:150]
+    hafta_tarihi_str = request.form.get('hafta_tarihi', '').strip()
+    hafta_tarihi = hafta_tarihi_str if hafta_tarihi_str else None
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -1242,8 +1263,8 @@ def hoca_vize_ekle():
         WHERE bolumid=%s AND haftano >= %s
     """, (bolum_id, hafta_no))
     cursor.execute(
-        "INSERT INTO VizeHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-        (bolum_id, hafta_no)
+        "INSERT INTO VizeHaftalari (bolumid, haftano, aciklama, islemyapan, hafta_tarihi) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+        (bolum_id, hafta_no, aciklama, islemyapan, hafta_tarihi)
     )
     conn.commit()
     flash(
@@ -1320,9 +1341,13 @@ def hoca_tatil_kaydir():
                                ELSE NULL END
         WHERE bolumid=%s AND haftano >= %s
     """, (bolum_id, hafta_no))
+    aciklama_t = request.form.get('aciklama', '').strip() or None
+    islemyapan_t = (session.get('hoca_name') or session.get('user_name') or 'Hoca')[:150]
+    hafta_tarihi_str_t = request.form.get('hafta_tarihi', '').strip()
+    hafta_tarihi_t = hafta_tarihi_str_t if hafta_tarihi_str_t else None
     cursor.execute(
-        "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-        (bolum_id, hafta_no)
+        "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano, aciklama, islemyapan, hafta_tarihi) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+        (bolum_id, hafta_no, aciklama_t, islemyapan_t, hafta_tarihi_t)
     )
     conn.commit()
     flash(

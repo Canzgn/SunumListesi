@@ -92,22 +92,36 @@ def admin_panel():
     donemler = cursor.fetchall()
 
     if admin_bolum_ids:
-        cursor.execute("SELECT DISTINCT haftano FROM VizeHaftalari WHERE bolumid = ANY(%s)", (admin_bolum_ids,))
+        cursor.execute(
+            "SELECT DISTINCT ON (haftano) haftano, aciklama, islemyapan, hafta_tarihi FROM VizeHaftalari WHERE bolumid = ANY(%s) ORDER BY haftano",
+            (admin_bolum_ids,)
+        )
     else:
         cursor.execute("""
-            SELECT DISTINCT vh.haftano FROM VizeHaftalari vh
+            SELECT DISTINCT ON (vh.haftano) vh.haftano, vh.aciklama, vh.islemyapan, vh.hafta_tarihi
+            FROM VizeHaftalari vh
             JOIN Bolumler b ON b.bolumid = vh.bolumid WHERE b.ogretimturu = %s
+            ORDER BY vh.haftano
         """, (selected_tur,))
-    vize_haftalar = {r.haftano for r in cursor.fetchall()}
+    vize_rows_admin = cursor.fetchall()
+    vize_haftalar = {r.haftano for r in vize_rows_admin}
+    vize_meta = {r.haftano: {'aciklama': r.aciklama, 'islemyapan': r.islemyapan, 'hafta_tarihi': r.hafta_tarihi} for r in vize_rows_admin}
 
     if admin_bolum_ids:
-        cursor.execute("SELECT DISTINCT haftano FROM TatilKaydirmaHaftalari WHERE bolumid = ANY(%s)", (admin_bolum_ids,))
+        cursor.execute(
+            "SELECT DISTINCT ON (haftano) haftano, aciklama, islemyapan, hafta_tarihi FROM TatilKaydirmaHaftalari WHERE bolumid = ANY(%s) ORDER BY haftano",
+            (admin_bolum_ids,)
+        )
     else:
         cursor.execute("""
-            SELECT DISTINCT tkh.haftano FROM TatilKaydirmaHaftalari tkh
+            SELECT DISTINCT ON (tkh.haftano) tkh.haftano, tkh.aciklama, tkh.islemyapan, tkh.hafta_tarihi
+            FROM TatilKaydirmaHaftalari tkh
             JOIN Bolumler b ON b.bolumid = tkh.bolumid WHERE b.ogretimturu = %s
+            ORDER BY tkh.haftano
         """, (selected_tur,))
-    tatilkaydir_haftalar = {r.haftano for r in cursor.fetchall()}
+    tatilkaydir_rows_admin = cursor.fetchall()
+    tatilkaydir_haftalar = {r.haftano for r in tatilkaydir_rows_admin}
+    tatilkaydir_meta = {r.haftano: {'aciklama': r.aciklama, 'islemyapan': r.islemyapan, 'hafta_tarihi': r.hafta_tarihi} for r in tatilkaydir_rows_admin}
 
     # Tatil çakışması olan hafta numaraları
     cursor.execute("""
@@ -150,6 +164,18 @@ def admin_panel():
         })
     schedule_data.sort(key=lambda x: x['HaftaNo'])
 
+    # Hafta → tarih haritası (placeholder haftalara tarih göstermek için)
+    hafta_tarih_map = {}
+    for r in vize_rows_admin:
+        if r.hafta_tarihi:
+            hafta_tarih_map[r.haftano] = r.hafta_tarihi
+    for r in tatilkaydir_rows_admin:
+        if r.hafta_tarihi:
+            hafta_tarih_map[r.haftano] = r.hafta_tarihi
+    for s in schedule_data:
+        if s.get('SunumTarihi'):
+            hafta_tarih_map[s['HaftaNo']] = s['SunumTarihi']
+
     return render_template('admin/admin_panel.html',
                            schedule_data=schedule_data,
                            selected_tur=selected_tur,
@@ -161,7 +187,10 @@ def admin_panel():
                            tatil_tarihleri=tatil_tarihleri,
                            akademik_bitis=akademik_bitis,
                            vize_haftalar=vize_haftalar,
+                           vize_meta=vize_meta,
                            tatilkaydir_haftalar=tatilkaydir_haftalar,
+                           tatilkaydir_meta=tatilkaydir_meta,
+                           hafta_tarih_map=hafta_tarih_map,
                            tatil_cadisi_haftalari=tatil_cadisi_haftalari,
                            tatil_gunleri=tatil_gunleri,
                            tum_konular=tum_konular,
@@ -195,6 +224,10 @@ def admin_panel_vize_ekle():
     if not bolum_ids:
         flash('Bu tür için bölüm bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
+    aciklama_v = request.form.get('aciklama', '').strip() or None
+    islemyapan_v = session.get('admin_name', 'Admin')[:150]
+    hafta_tarihi_str_v = request.form.get('hafta_tarihi', '').strip()
+    hafta_tarihi_v = hafta_tarihi_str_v if hafta_tarihi_str_v else None
     for bid in bolum_ids:
         cursor.execute(
             "UPDATE SunumProgrami SET haftano = haftano+1, "
@@ -203,8 +236,8 @@ def admin_panel_vize_ekle():
             (bid, hafta_no)
         )
         cursor.execute(
-            "INSERT INTO VizeHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (bid, hafta_no)
+            "INSERT INTO VizeHaftalari (bolumid, haftano, aciklama, islemyapan, hafta_tarihi) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+            (bid, hafta_no, aciklama_v, islemyapan_v, hafta_tarihi_v)
         )
     conn.commit()
     flash(f'{hafta_no}. Hafta vize haftası olarak işaretlendi.', 'success')
@@ -274,6 +307,10 @@ def admin_panel_tatil_kaydir():
     else:
         cursor.execute("SELECT BolumID FROM Bolumler WHERE OgretimTuru = %s", (tur,))
     bolum_ids = [r.BolumID for r in cursor.fetchall()]
+    aciklama_t = request.form.get('aciklama', '').strip() or None
+    islemyapan_t = session.get('admin_name', 'Admin')[:150]
+    hafta_tarihi_str_t = request.form.get('hafta_tarihi', '').strip()
+    hafta_tarihi_t = hafta_tarihi_str_t if hafta_tarihi_str_t else None
     for bid in bolum_ids:
         cursor.execute(
             "UPDATE SunumProgrami SET haftano = haftano+1, "
@@ -282,8 +319,8 @@ def admin_panel_tatil_kaydir():
             (bid, hafta_no)
         )
         cursor.execute(
-            "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (bid, hafta_no)
+            "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano, aciklama, islemyapan, hafta_tarihi) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+            (bid, hafta_no, aciklama_t, islemyapan_t, hafta_tarihi_t)
         )
     conn.commit()
     flash(f'{hafta_no}. Hafta tatil kaydırması uygulandı.', 'success')

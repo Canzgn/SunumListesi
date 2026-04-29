@@ -206,7 +206,17 @@
     {% if sunum.HaftaNo != ns.last_week %}
     <div id="hafta-{{ sunum.HaftaNo }}" class="{% if sunum.HaftaNo in vize_haftalar|default([]) %}bg-gradient-to-r from-purple-700 to-violet-700 shadow-lg shadow-purple-900/30{% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}bg-gradient-to-r from-orange-600 to-red-600 shadow-lg shadow-orange-900/30{% else %}bg-slate-800{% endif %} text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3 flex-wrap">
         {{ sunum.HaftaNo }}. HAFTA
-        {% if not sunum.SunumID %}{% if sunum.HaftaNo in vize_haftalar %}&mdash; VİZE HAFTASI{% elif sunum.HaftaNo in tatilkaydir_haftalar %}&mdash; TATİL KAYDIRMASI{% endif %}{% endif %}
+        {% if sunum.HaftaNo in vize_haftalar %}
+        &mdash; VİZE HAFTASI
+        {% set _vmeta = vize_meta.get(sunum.HaftaNo) %}
+        {% if _vmeta and _vmeta.aciklama %}<span class="font-semibold normal-case not-italic tracking-normal text-purple-200"> — {{ _vmeta.aciklama }}</span>{% endif %}
+        {% if _vmeta and _vmeta.islemyapan %}<span class="font-normal text-[9px] normal-case not-italic tracking-normal text-purple-300 opacity-80">({{ _vmeta.islemyapan }})</span>{% endif %}
+        {% elif sunum.HaftaNo in tatilkaydir_haftalar %}
+        &mdash; TATİL KAYDIRMASI
+        {% set _tmeta = tatilkaydir_meta.get(sunum.HaftaNo) %}
+        {% if _tmeta and _tmeta.aciklama %}<span class="font-semibold normal-case not-italic tracking-normal text-orange-200"> — {{ _tmeta.aciklama }}</span>{% endif %}
+        {% if _tmeta and _tmeta.islemyapan %}<span class="font-normal text-[9px] normal-case not-italic tracking-normal text-orange-300 opacity-80">({{ _tmeta.islemyapan }})</span>{% endif %}
+        {% endif %}
         {% if sunum.SunumTarihi %}
         <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
         {% if sunum.SunumTarihi in tatil_tarihleri|default([]) %}
@@ -244,24 +254,35 @@
             <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="next" value="sunum_panel">
-            <button type="submit" class="text-[9px] font-black text-red-200 hover:text-white border border-red-400 hover:bg-red-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
-                <i class="fa-solid fa-calendar-xmark"></i> Bu haftadan kaydır
-            </button>
+            <input type="hidden" name="hafta_tarihi" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}">
+            <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
+                <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
+                    class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-red-400 outline-none w-32 placeholder-slate-400">
+                <button type="submit" class="text-[9px] font-black text-red-200 hover:text-white border border-red-400 hover:bg-red-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1">
+                    <i class="fa-solid fa-calendar-xmark"></i> Bu haftadan kaydır
+                </button>
+            </div>
         </form>
         {% endif %}
         <form action="/hoca/vize_ekle" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta vize haftası olarak işaretlensin mi?\nBu hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılacak.')">
             <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="next" value="sunum_panel">
-            <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
-                <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
-            </button>
+            <input type="hidden" name="hafta_tarihi" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}">
+            <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
+                <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
+                    class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-purple-400 outline-none w-32 placeholder-slate-400">
+                <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1">
+                    <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
+                </button>
+            </div>
         </form>
         {% endif %}
         <form action="/admin/update_hafta_tarihi" method="POST" class="ml-auto flex items-center gap-2 normal-case not-italic tracking-normal">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
-            <input type="date" name="yeni_tarih" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}"
+            {% set _dt = sunum.SunumTarihi or hafta_tarih_map.get(sunum.HaftaNo) %}
+            <input type="date" name="yeni_tarih" value="{{ _dt.strftime('%Y-%m-%d') if _dt else '' }}"
                 class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 outline-none cursor-pointer hover:border-blue-400 transition"
                 onchange="this.form.submit()" title="Hafta tarihini değiştir">
         </form>
