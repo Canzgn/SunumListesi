@@ -204,7 +204,7 @@
     {% set ns = namespace(last_week=0) %}
     {% for sunum in schedule_data %}
     {% if sunum.HaftaNo != ns.last_week %}
-    <div id="hafta-{{ sunum.HaftaNo }}" class="bg-slate-800 text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3 flex-wrap">
+    <div id="hafta-{{ sunum.HaftaNo }}" class="{% if sunum.HaftaNo in vize_haftalar|default([]) %}bg-gradient-to-r from-purple-700 to-violet-700 shadow-lg shadow-purple-900/30{% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}bg-gradient-to-r from-orange-600 to-red-600 shadow-lg shadow-orange-900/30{% else %}bg-slate-800{% endif %} text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3 flex-wrap">
         {{ sunum.HaftaNo }}. HAFTA
         {% if sunum.SunumTarihi %}
         <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
@@ -213,12 +213,6 @@
         {% elif akademik_bitis and sunum.SunumTarihi > akademik_bitis %}
         <span class="text-[9px] font-black bg-amber-400 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-calendar-xmark"></i> Takvim Dışı</span>
         {% endif %}
-        {% endif %}
-        {% if sunum.HaftaNo in vize_haftalar|default([]) %}
-        <span class="text-[9px] font-black bg-purple-500 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-graduation-cap"></i> Vize</span>
-        {% endif %}
-        {% if sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}
-        <span class="text-[9px] font-black bg-orange-500 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-arrows-left-right"></i> Kaydırıldı</span>
         {% endif %}
         {# ── HAFTA YÖNETİM BUTONLARI ── #}
         {% if sunum.HaftaNo in vize_haftalar|default([]) %}
