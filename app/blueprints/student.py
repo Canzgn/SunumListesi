@@ -93,6 +93,25 @@ def student_panel():
     cursor.execute("SELECT DISTINCT SunumID FROM SoruBasvurulari WHERE OgrenciNo = %s", (current_no,))
     my_question_ids = {row.SunumID for row in cursor.fetchall()}
 
+    cursor.execute("""
+        SELECT DISTINCT vh.haftano FROM VizeHaftalari vh
+        JOIN Bolumler b ON b.bolumid = vh.bolumid WHERE b.ogretimturu = %s
+    """, (selected_tur,))
+    vize_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("""
+        SELECT DISTINCT tkh.haftano FROM TatilKaydirmaHaftalari tkh
+        JOIN Bolumler b ON b.bolumid = tkh.bolumid WHERE b.ogretimturu = %s
+    """, (selected_tur,))
+    tatilkaydir_haftalar = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("SELECT tarih FROM TatilGunleri ORDER BY tarih")
+    tatil_tarihleri = [r.tarih for r in cursor.fetchall()]
+
+    cursor.execute("SELECT MIN(d.donembitis) FROM Donemler d WHERE d.aktif=TRUE AND d.donembitis IS NOT NULL")
+    ab_row = cursor.fetchone()
+    akademik_bitis = ab_row[0] if ab_row else None
+
     return render_template('student/student_panel.html',
                            schedule_data=schedule_data,
                            selected_tur=selected_tur,
@@ -100,7 +119,11 @@ def student_panel():
                            my_basvuru_count=my_basvuru_count,
                            my_soru_count=my_soru_count,
                            my_applied_ids=my_applied_ids,
-                           my_question_ids=my_question_ids)
+                           my_question_ids=my_question_ids,
+                           vize_haftalar=vize_haftalar,
+                           tatilkaydir_haftalar=tatilkaydir_haftalar,
+                           tatil_tarihleri=tatil_tarihleri,
+                           akademik_bitis=akademik_bitis)
 
 
 @student_bp.route('/topic/<int:sunum_id>')
@@ -476,7 +499,30 @@ def student_profile_edit():
 @student_bp.route('/mesaj_gonder')
 @student_required
 def mesaj_gonder_page():
-    return render_template('student/mesaj_gonder.html')
+    current_no = session['student_no']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Öğrencinin bölümüne atanmış onaylı admin(ler)i bul
+    cursor.execute("""
+        SELECT a.AdminID, a.AdSoyad FROM Ogrenciler o
+        JOIN AdminBolumler ab ON ab.BolumID = o.BolumID
+        JOIN Admins a ON a.AdminID = ab.AdminID
+        WHERE o.OgrenciNo = %s AND a.IsApproved = TRUE
+        ORDER BY a.AdminID
+    """, (current_no,))
+    bolum_adminleri = cursor.fetchall()
+    # Öğrencinin bölüm hocasını bul
+    cursor.execute("""
+        SELECT h.HocaID, h.AdSoyad FROM Ogrenciler o
+        JOIN HocaBolumler hb ON hb.BolumID = o.BolumID
+        JOIN Hocalar h ON h.HocaID = hb.HocaID
+        WHERE o.OgrenciNo = %s
+        ORDER BY h.HocaID
+    """, (current_no,))
+    bolum_hocalari = cursor.fetchall()
+    return render_template('student/mesaj_gonder.html',
+                           bolum_adminleri=bolum_adminleri,
+                           bolum_hocalari=bolum_hocalari)
 
 
 # =====================================================================
@@ -686,6 +732,7 @@ def sunum_arsivi():
     bolum_id = request.args.get('bolum_id', type=int)
     tip = (request.args.get('tip') or '').strip().lower()
     q = (request.args.get('q') or '').strip()
+    sort = request.args.get('sort', 'tarih')  # tarih | hafta | konu
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -711,6 +758,13 @@ def sunum_arsivi():
 
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
+    if sort == 'hafta':
+        order_sql = "sp.HaftaNo ASC NULLS LAST, k.KonuAdi ASC, d.YuklemeTarihi DESC"
+    elif sort == 'konu':
+        order_sql = "k.KonuAdi ASC, sp.HaftaNo ASC NULLS LAST, d.YuklemeTarihi DESC"
+    else:
+        order_sql = "d.YuklemeTarihi DESC"
+
     cursor.execute(f"""
         SELECT d.DosyaID, d.DosyaTipi, d.DosyaAdi, d.DosyaBoyutu, d.YuklemeTarihi, d.Aciklama,
                d.SunumID, k.KonuAdi, sp.HaftaNo, sp.SunumTarihi, sp.OgretimTuru,
@@ -723,7 +777,7 @@ def sunum_arsivi():
         LEFT JOIN Donemler dn ON dn.DonemID = b.DonemID
         LEFT JOIN Ogrenciler o ON o.OgrenciID = d.YukleyenOgrenciID
         {where_sql}
-        ORDER BY d.YuklemeTarihi DESC
+        ORDER BY {order_sql}
         LIMIT 500
     """, tuple(params))
     dosyalar = cursor.fetchall()
@@ -758,7 +812,7 @@ def sunum_arsivi():
                            dosyalar=dosyalar, ekipler=ekipler,
                            donemler=donemler, bolumler=bolumler,
                            tip_dagilimi=tip_dagilimi,
-                           f_donem=donem_id, f_bolum=bolum_id, f_tip=tip, f_q=q)
+                           f_donem=donem_id, f_bolum=bolum_id, f_tip=tip, f_q=q, f_sort=sort)
 
 
 @student_bp.route('/sunum/<int:sunum_id>/soru_manuel_ekle', methods=['POST'])

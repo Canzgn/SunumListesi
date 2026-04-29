@@ -28,7 +28,7 @@
 
     {# ===== FİLTRELER ===== #}
     <form method="GET" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
             <div>
                 <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Dönem</label>
                 <select name="donem_id" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-sm bg-gray-50 focus:border-blue-400 outline-none">
@@ -60,6 +60,14 @@
                 <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Ara (konu / dosya adı)</label>
                 <input type="text" name="q" value="{{ f_q or '' }}" placeholder="örn: HTML, Docker, makale..."
                        class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-sm bg-gray-50 focus:border-blue-400 outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1">Sıralama</label>
+                <select name="sort" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-sm bg-gray-50 focus:border-blue-400 outline-none">
+                    <option value="tarih" {% if f_sort == 'tarih' %}selected{% endif %}>En Yeni Yükleme</option>
+                    <option value="hafta" {% if f_sort == 'hafta' %}selected{% endif %}>Hafta / Konu</option>
+                    <option value="konu" {% if f_sort == 'konu' %}selected{% endif %}>Konu / Hafta</option>
+                </select>
             </div>
             <div class="flex items-end gap-2">
                 <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm px-4 py-2 rounded-xl transition shadow-md">

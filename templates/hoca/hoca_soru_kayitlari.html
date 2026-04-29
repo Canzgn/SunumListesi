@@ -1,0 +1,188 @@
+{% extends "shared/layout.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    {# BAŞLIK + FİLTRELER #}
+    <div class="bg-white p-6 rounded-2xl shadow-lg border-b-4 border-purple-600 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-black text-gray-800 uppercase tracking-tighter">Soru Seçim Kayıtları</h1>
+            <p class="text-xs text-gray-500 font-medium mt-1">Konulara gelen soru başvuruları — konu bazlı görünüm</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {# Öğretim Türü Sekmeleri #}
+            <div class="flex bg-gray-100 p-0.5 rounded-xl text-[10px] font-black">
+                <a href="?tur=&hafta={{ hafta_filter }}"
+                   class="px-3 py-1.5 rounded-lg transition {% if not tur_filter %}bg-white shadow text-purple-700{% else %}text-gray-500 hover:text-gray-700{% endif %}">Tümü</a>
+                <a href="?tur=Örgün&hafta={{ hafta_filter }}"
+                   class="px-3 py-1.5 rounded-lg transition {% if tur_filter=='Örgün' %}bg-white shadow text-blue-700{% else %}text-gray-500 hover:text-gray-700{% endif %}">Örgün</a>
+                <a href="?tur=Gece&hafta={{ hafta_filter }}"
+                   class="px-3 py-1.5 rounded-lg transition {% if tur_filter=='Gece' %}bg-white shadow text-purple-700{% else %}text-gray-500 hover:text-gray-700{% endif %}">Gece</a>
+            </div>
+            {# Hafta Seçici #}
+            <form method="GET" class="flex items-center gap-1">
+                <input type="hidden" name="tur" value="{{ tur_filter }}">
+                <select name="hafta" onchange="this.form.submit()"
+                        class="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:border-purple-400">
+                    <option value="">Tüm Haftalar</option>
+                    {% for h in hafta_listesi %}
+                    <option value="{{ h }}" {% if hafta_filter == h|string %}selected{% endif %}>Hafta {{ h }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {# Aktif filtre göstergesi #}
+            {% if tur_filter or hafta_filter %}
+            <a href="/hoca/soru_kayitlari" class="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-xl text-[10px] font-black transition">
+                <i class="fa-solid fa-xmark"></i> Filtreyi Temizle
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ÖZET SAYAÇLAR #}
+    {% if grouped %}
+    {% set onayli = [] %}
+    {% set bekleyen = [] %}
+    {% set _ns_total = namespace(toplam_kayit=0) %}
+    {% for grp in grouped.values() %}
+        {% set _ns_total.toplam_kayit = _ns_total.toplam_kayit + (grp.kayitlar|length) %}
+        {% for app in grp.kayitlar %}
+            {% if app.IsApproved == true %}{% set _ = onayli.append(1) %}{% endif %}
+            {% if app.SunanOnayi == true and app.IsApproved is none %}{% set _ = bekleyen.append(1) %}{% endif %}
+        {% endfor %}
+    {% endfor %}
+    {% set toplam_kayit = _ns_total.toplam_kayit %}
+    <div class="flex flex-wrap gap-3">
+        <span class="bg-gray-100 text-gray-600 text-xs font-black px-3 py-1.5 rounded-xl">{{ grouped|length }} konu</span>
+        <span class="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1.5 rounded-xl">{{ onayli|length }} tam onaylı</span>
+        <span class="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1.5 rounded-xl">{{ bekleyen|length }} admin onayı bekliyor</span>
+    </div>
+    {% endif %}
+
+    {# KONU BAZLI ACCORDION #}
+    {% if grouped %}
+    {% for sunum_id, grp in grouped.items() | sort(attribute='1.konu') | sort(attribute='1.hafta') %}
+    {% set toplam = grp.kayitlar | length %}
+    {% set onayli_sayi = grp.kayitlar | selectattr('IsApproved', 'equalto', true) | list | length %}
+    {% set reddedilen_sayi = grp.kayitlar | selectattr('IsApproved', 'equalto', false) | list | length %}
+    {% set bekleyen_sayi = toplam - onayli_sayi - reddedilen_sayi %}
+
+    <div class="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
+        {# Başlık (tıklanabilir) #}
+        <button onclick="toggleGrp('grp-{{ sunum_id }}')"
+                class="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition group">
+            <div class="flex items-center gap-3 flex-wrap">
+                <span class="bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-lg">H{{ grp.hafta }}</span>
+                <span class="text-[10px] font-black px-2 py-1 rounded-lg {% if grp.tur == 'Örgün' %}bg-blue-100 text-blue-700{% else %}bg-purple-100 text-purple-700{% endif %}">
+                    {{ grp.tur }}
+                </span>
+                <span class="font-black text-gray-800 text-sm group-hover:text-purple-700 transition">{{ grp.konu }}</span>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0 ml-3">
+                <div class="flex gap-1.5 text-[9px] font-black">
+                    {% if onayli_sayi > 0 %}
+                    <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg">{{ onayli_sayi }} onaylı</span>
+                    {% endif %}
+                    {% if bekleyen_sayi > 0 %}
+                    <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">{{ bekleyen_sayi }} bekliyor</span>
+                    {% endif %}
+                    {% if reddedilen_sayi > 0 %}
+                    <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-lg">{{ reddedilen_sayi }} red</span>
+                    {% endif %}
+                </div>
+                <i class="fa-solid fa-chevron-down text-gray-400 text-xs transition-transform group-[.open]:rotate-180" id="icon-grp-{{ sunum_id }}"></i>
+            </div>
+        </button>
+
+        {# Kayıt Listesi (gizli) #}
+        <div id="grp-{{ sunum_id }}" class="hidden border-t border-gray-100 divide-y divide-gray-50">
+            {% for app in grp.kayitlar %}
+            {% set sunan_ok = app.SunanOnayi == true %}
+            {% set admin_ok = app.IsApproved == true %}
+            {% set admin_red = app.IsApproved == false %}
+            <div class="px-5 py-3 flex flex-col md:flex-row md:items-center gap-3
+                {% if admin_ok %}bg-emerald-50/60
+                {% elif admin_red %}bg-red-50/60
+                {% elif sunan_ok %}bg-amber-50/40
+                {% endif %}">
+
+                {# Öğrenci bilgisi #}
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                        <span class="font-black text-sm text-blue-700">{{ app.OgrenciNo }}</span>
+                        {% if app.AdSoyad %}
+                        <span class="text-xs text-gray-600 font-semibold">{{ app.AdSoyad }}</span>
+                        {% endif %}
+                        <span class="text-[10px] text-gray-400 font-mono">
+                            {{ app.ZamanDamgasi.strftime('%d.%m.%Y %H:%M') if app.ZamanDamgasi else '--' }}
+                        </span>
+                    </div>
+                    {% if app.SoruIcerigi %}
+                    <p class="text-xs text-gray-500 italic">"{{ app.SoruIcerigi }}"</p>
+                    {% endif %}
+                    {% if app.RejectReason and admin_red %}
+                    <p class="text-[10px] text-red-600 font-bold mt-0.5">
+                        <i class="fa-solid fa-circle-exclamation mr-1"></i>{{ app.RejectReason }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                {# Onay zinciri #}
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    {% if sunan_ok %}
+                        <span class="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-1 rounded-lg uppercase">
+                            <i class="fa-solid fa-check mr-0.5"></i>Sunan
+                        </span>
+                    {% elif app.SunanOnayi == false %}
+                        <span class="bg-red-100 text-red-700 text-[9px] font-black px-2 py-1 rounded-lg uppercase">
+                            <i class="fa-solid fa-xmark mr-0.5"></i>Sunan Red
+                        </span>
+                    {% else %}
+                        <span class="bg-gray-100 text-gray-500 text-[9px] font-black px-2 py-1 rounded-lg uppercase">
+                            <i class="fa-solid fa-clock mr-0.5"></i>Sunan Bekliyor
+                        </span>
+                    {% endif %}
+                    <i class="fa-solid fa-arrow-right text-gray-300 text-[10px]"></i>
+                    {% if admin_ok %}
+                        <span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase">
+                            <i class="fa-solid fa-check-double mr-0.5"></i>Admin ✓
+                        </span>
+                    {% elif admin_red %}
+                        <span class="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase">
+                            <i class="fa-solid fa-ban mr-0.5"></i>Reddedildi
+                        </span>
+                    {% else %}
+                        <span class="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-1 rounded-lg uppercase">
+                            <i class="fa-solid fa-hourglass-half mr-0.5"></i>Admin Bekliyor
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div class="bg-white rounded-3xl shadow-xl p-16 text-center border border-gray-100">
+        <i class="fa-solid fa-folder-open text-5xl text-gray-200 mb-4"></i>
+        <p class="text-gray-400 font-black text-lg">Henüz soru kaydı bulunmuyor.</p>
+        {% if tur_filter or hafta_filter %}
+        <p class="text-gray-400 text-sm mt-2">Filtrelerinizi değiştirmeyi deneyin.</p>
+        <a href="/hoca/soru_kayitlari" class="inline-flex items-center gap-2 mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-black text-xs transition">
+            <i class="fa-solid fa-xmark"></i> Filtreyi Temizle
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+    function toggleGrp(id) {
+        const el = document.getElementById(id);
+        const icon = document.getElementById('icon-' + id);
+        el.classList.toggle('hidden');
+        if (icon) icon.style.transform = el.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    }
+</script>
+{% endblock %}

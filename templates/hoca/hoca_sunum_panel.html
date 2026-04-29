@@ -112,9 +112,94 @@
         </div>
     </div>
 
+    {# ===== TATİL VE TAKVİM DIŞI UYARILARI ===== #}
+    {% if tatil_cadisi_sayisi > 0 or takvim_disi_sayisi > 0 %}
+    <div class="space-y-2">
+        {% if tatil_cadisi_sayisi > 0 %}
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-red-700">{{ tatil_cadisi_sayisi }} sunum tatil gününe denk geliyor</p>
+                    <p class="text-xs text-red-500">Hafta başlığındaki "Bu haftadan kaydır" butonunu kullanın veya toplu Domino uygulayabilirsiniz.</p>
+                </div>
+            </div>
+            <button onclick="openDominoModal()"
+               class="shrink-0 bg-red-600 hover:bg-red-700 text-white text-xs font-black px-4 py-2 rounded-xl transition">
+                <i class="fa-solid fa-rotate mr-1"></i>Domino Uygula
+            </button>
+        </div>
+        {% endif %}
+        {% if takvim_disi_sayisi > 0 %}
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
+                    <p class="text-xs text-amber-600">Konular takvime sığmıyor — otomatik yerleştirmek ister misiniz? (Geri alınabilir)</p>
+                </div>
+            </div>
+            <form action="{{ url_for('hoca.hoca_auto_fit_uygula') }}" method="POST"
+                  onsubmit="return confirm('Sarkık konular sıralarını koruyarak mevcut haftalara dağıtılacak. Devam edilsin mi?\n\nBu işlem geri alınabilir.')">
+                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                <input type="hidden" name="next" value="sunum_panel">
+                <button type="submit"
+                    class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black px-4 py-2 rounded-xl transition flex items-center gap-1">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Otomatik Yerleştir
+                </button>
+            </form>
+        </div>
+        {% endif %}
+        {% if active_autofit %}
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-emerald-700">Otomatik yerleştirme uygulandı</p>
+                    <p class="text-xs text-emerald-600">
+                        {{ active_autofit.olusturma_tarihi.strftime('%d.%m.%Y %H:%M') }} — {{ active_autofit.islemyapan or 'Sistem' }}
+                    </p>
+                </div>
+            </div>
+            <form action="{{ url_for('hoca.hoca_auto_fit_geri_al') }}" method="POST"
+                  onsubmit="return confirm('Otomatik yerleştirme geri alınsın mı? Slotlar önceki konumlarına geri dönecek.')">
+                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                <input type="hidden" name="gecmisid" value="{{ active_autofit.gecmisid }}">
+                <input type="hidden" name="next" value="sunum_panel">
+                <button type="submit"
+                    class="shrink-0 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-black px-4 py-2 rounded-xl transition flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> Geri Al
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% elif active_autofit %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
+            <div>
+                <p class="text-sm font-black text-emerald-700">Otomatik yerleştirme uygulandı</p>
+                <p class="text-xs text-emerald-600">
+                    {{ active_autofit.olusturma_tarihi.strftime('%d.%m.%Y %H:%M') }} — {{ active_autofit.islemyapan or 'Sistem' }}
+                </p>
+            </div>
+        </div>
+        <form action="{{ url_for('hoca.hoca_auto_fit_geri_al') }}" method="POST"
+              onsubmit="return confirm('Otomatik yerleştirme geri alınsın mı? Slotlar önceki konumlarına geri dönecek.')">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="gecmisid" value="{{ active_autofit.gecmisid }}">
+            <input type="hidden" name="next" value="sunum_panel">
+            <button type="submit"
+                class="shrink-0 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-black px-4 py-2 rounded-xl transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate-left"></i> Geri Al
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
     {# ===== TOPLU İŞLEM BUTONLARI ===== #}
-    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-        <div class="flex flex-wrap gap-3">
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">        <div class="flex flex-wrap gap-3">
             <form action="/admin/auto_assign" method="POST">
                 <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
                 <button type="submit"
@@ -142,20 +227,122 @@
         </div>
     </div>
 
+    {# ===== YENİ SLOT EKLE ===== #}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <button onclick="toggleSlotEkle()" class="w-full flex items-center gap-2 px-5 py-3 text-left hover:bg-gray-50 transition">
+            <i class="fa-solid fa-plus-circle text-cyan-500 text-sm"></i>
+            <span class="font-black text-gray-700 text-sm uppercase tracking-widest">Yeni Sunum Slotu Ekle</span>
+            <i class="fa-solid fa-chevron-down ml-auto text-gray-300 text-xs" id="slot-ekle-chev" style="transition:transform .2s"></i>
+        </button>
+        <div id="slot-ekle-body" class="hidden px-5 pb-4">
+            <form action="/hoca/sunum_ekle" method="POST" class="flex flex-col sm:flex-row gap-3">
+                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                <input type="hidden" name="next" value="sunum_panel">
+                <select name="konu_id" required
+                        class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium outline-none focus:border-cyan-400">
+                    <option value="">— Konu seçin —</option>
+                    {% for k in tum_konular|default([]) %}
+                    <option value="{{ k.KonuID }}">{{ k.KonuAdi }}</option>
+                    {% endfor %}
+                </select>
+                <input type="number" name="hafta_no" required min="1" max="52" placeholder="Hafta No"
+                       class="w-28 border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium text-center outline-none focus:border-cyan-400">
+                <button type="submit"
+                        class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-xl font-black text-sm transition whitespace-nowrap">
+                    <i class="fa-solid fa-plus mr-1"></i>Ekle
+                </button>
+            </form>
+        </div>
+    </div>
+
     {# ===== SUNUM SLOTLARI ===== #}
     {% if schedule_data %}
     {% set ns = namespace(last_week=0) %}
     {% for sunum in schedule_data %}
     {% if sunum.HaftaNo != ns.last_week %}
-    <div class="bg-slate-800 text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3">
+    <div id="hafta-{{ sunum.HaftaNo }}" class="{% if sunum.HaftaNo in vize_haftalar|default([]) %}bg-gradient-to-r from-purple-700 to-violet-700 shadow-lg shadow-purple-900/30{% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}bg-gradient-to-r from-orange-600 to-red-600 shadow-lg shadow-orange-900/30{% else %}bg-slate-800{% endif %} text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3 flex-wrap">
         {{ sunum.HaftaNo }}. HAFTA
-        {% if sunum.SunumTarihi %}
-        <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
+        {% if sunum.HaftaNo in vize_haftalar %}
+        &mdash; VİZE HAFTASI
+        {% set _vmeta = vize_meta.get(sunum.HaftaNo) %}
+        {% if _vmeta and _vmeta.aciklama %}<span class="font-semibold normal-case not-italic tracking-normal text-purple-200"> — {{ _vmeta.aciklama }}</span>{% endif %}
+        {% if _vmeta and _vmeta.islemyapan %}<span class="font-normal text-[9px] normal-case not-italic tracking-normal text-purple-300 opacity-80">({{ _vmeta.islemyapan }})</span>{% endif %}
+        {% elif sunum.HaftaNo in tatilkaydir_haftalar %}
+        &mdash; TATİL KAYDIRMASI
+        {% set _tmeta = tatilkaydir_meta.get(sunum.HaftaNo) %}
+        {% if _tmeta and _tmeta.aciklama %}<span class="font-semibold normal-case not-italic tracking-normal text-orange-200"> — {{ _tmeta.aciklama }}</span>{% endif %}
+        {% if _tmeta and _tmeta.islemyapan %}<span class="font-normal text-[9px] normal-case not-italic tracking-normal text-orange-300 opacity-80">({{ _tmeta.islemyapan }})</span>{% endif %}
         {% endif %}
+        {% set _hdt = sunum.SunumTarihi or hafta_tarih_map.get(sunum.HaftaNo) %}
+        {% if _hdt %}
+        <span class="text-slate-300 font-bold normal-case not-italic">— {{ _hdt.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][_hdt.weekday()] }}</span>
+        {% if _hdt in tatil_tarihleri|default([]) %}
+        <span class="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-triangle-exclamation"></i> Tatil</span>
+        {% elif akademik_bitis and _hdt > akademik_bitis %}
+        <span class="text-[9px] font-black bg-amber-400 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-calendar-xmark"></i> Takvim Dışı</span>
+        {% endif %}
+        {% endif %}
+        {# ── HAFTA YÖNETİM BUTONLARI ── #}
+        {% if sunum.HaftaNo in vize_haftalar|default([]) %}
+        {% for vr in vize_records|default([]) if vr.haftano == sunum.HaftaNo %}
+        <form action="/hoca/vize_sil" method="POST" onsubmit="return confirm('Vize haftası geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.')">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="vize_id" value="{{ vr.vizeid }}">
+            <input type="hidden" name="next" value="sunum_panel">
+            <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
+                <i class="fa-solid fa-rotate-left"></i> Geri Al
+            </button>
+        </form>
+        {% endfor %}
+        {% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}
+        {% for tr in tatilkaydir_records|default([]) if tr.haftano == sunum.HaftaNo %}
+        <form action="/hoca/tatil_kaydir_sil" method="POST" onsubmit="return confirm('Tatil kaydırması geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.')">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="tatilkaydir_id" value="{{ tr.tatilkaydiraid }}">
+            <input type="hidden" name="next" value="sunum_panel">
+            <button type="submit" class="text-[9px] font-black text-orange-200 hover:text-white border border-orange-400 hover:bg-orange-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
+                <i class="fa-solid fa-rotate-left"></i> Geri Al
+            </button>
+        </form>
+        {% endfor %}
+        {% else %}
+        {% if sunum.HaftaNo in tatil_cadisi_haftalari|default([]) %}
+        <form action="/hoca/tatil_kaydir" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılsın mı?')">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
+            <input type="hidden" name="next" value="sunum_panel">
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
+            <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
+                <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
+                    class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-red-400 outline-none w-32 placeholder-slate-400">
+                <button type="submit" class="text-[9px] font-black text-red-200 hover:text-white border border-red-400 hover:bg-red-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1">
+                    <i class="fa-solid fa-calendar-xmark"></i> Bu haftadan kaydır
+                </button>
+            </div>
+        </form>
+        {% endif %}
+        <form action="/hoca/vize_ekle" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta vize haftası olarak işaretlensin mi?\nBu hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılacak.\nAynı dönemdeki tüm bölümler de aynı haftada kaydırılacak.')">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
+            <input type="hidden" name="next" value="sunum_panel">
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
+            <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1 normal-case not-italic tracking-normal">
+                <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
+            </button>
+        </form>
+        {% endif %}
+        <form action="/admin/update_hafta_tarihi" method="POST" class="ml-auto flex items-center gap-2 normal-case not-italic tracking-normal">
+            <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
+            <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
+            <input type="date" name="yeni_tarih" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}"
+                class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 outline-none cursor-pointer hover:border-blue-400 transition"
+                onchange="this.form.submit()" title="Hafta tarihini değiştir">
+        </form>
     </div>
     {% set ns.last_week = sunum.HaftaNo %}
     {% endif %}
 
+    {% if sunum.SunumID %}
     <div id="sunum-{{ sunum.SunumID }}" class="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 transition
                     {% if sunum.Onaylanan %}border-emerald-400{% else %}border-gray-200{% endif %}">
 
@@ -192,6 +379,11 @@
                             <i class="fa-solid fa-rotate-left text-[10px]"></i> Onayı Kaldır
                         </button>
                     </form>
+                    <button type="button" onclick="openMoveModal({{ sunum.SunumID }}, {{ sunum.HaftaNo }}, '{{ sunum.KonuAdi|replace("'", "\\'")|replace('"', '\\"') }}', '{{ secili_bolum.OgretimTuru }}')"
+                        class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-xl font-black text-xs transition flex items-center gap-1.5 whitespace-nowrap shadow-sm flex-shrink-0"
+                        title="Haftasını değiştir">
+                        <i class="fa-solid fa-arrows-up-down-left-right text-[10px]"></i>
+                    </button>
                 </div>
                 <div class="flex flex-wrap gap-1 mt-1.5">
                     {% for a in sunum.Atananlar %}
@@ -274,6 +466,7 @@
         </div>
 
     </div>
+    {% endif %}{# end sunum.SunumID #}
     {% endfor %}
 
     {% else %}
@@ -287,6 +480,48 @@
     {% endif %}{# end secili_bolum #}
 
 </div>
+
+{# ===== DOMİNO MODALI (Hoca Sunum Panel) ===== #}
+{% if secili_bolum %}
+<div id="dominoModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <h3 class="font-black text-gray-800 text-lg mb-2">
+            <i class="fa-solid fa-rotate text-red-500 mr-2"></i>Domino Kaydırma
+        </h3>
+        <p class="text-xs text-gray-500 mb-4">Seçili tarihten itibaren tüm sonraki slotlar +7 gün kaydırılır.</p>
+        <div class="mb-4">
+            <label class="text-xs font-black text-gray-600 uppercase mb-1 block">Tatil Tarihi Seç:</label>
+            <select id="domino-tatil-select" onchange="previewDominoPanel()"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none">
+                <option value="">— Seçin —</option>
+                {% for t in tatil_gunleri|default([]) if t.eylemtipi == 'kaydir' %}
+                <option value="{{ t.tarih.strftime('%Y-%m-%d') }}">{{ t.tarih.strftime('%d.%m.%Y') }}{% if t.aciklama %} — {{ t.aciklama }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div id="domino-preview-list" class="bg-gray-50 rounded-xl p-3 max-h-48 overflow-y-auto mb-4 text-xs hidden">
+            <p class="font-black text-gray-600 mb-2">Etkilenecek slotlar:</p>
+            <div id="domino-preview-items"></div>
+        </div>
+        <form action="/hoca/domino_uygula" method="POST">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="shift_days" value="7">
+            <input type="hidden" name="next" value="sunum_panel">
+            <input type="hidden" name="tatil_tarihi" id="domino-tatil-hidden">
+            <div class="flex gap-2">
+                <button type="submit" id="domino-submit-btn" disabled
+                        class="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-black text-sm py-2 rounded-xl transition">
+                    <i class="fa-solid fa-check mr-1"></i>Onayla ve Uygula
+                </button>
+                <button type="button" onclick="closeDominoModal()"
+                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-black text-sm rounded-xl transition">
+                    İptal
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
 
 
 {# ===== HAFTA TAŞIMA MODALI ===== #}
@@ -339,6 +574,38 @@
 <script>
     function toggleDetails(id) {
         document.getElementById(id).classList.toggle('hidden');
+    }
+
+    function toggleSlotEkle() {
+        const body = document.getElementById('slot-ekle-body');
+        const chev = document.getElementById('slot-ekle-chev');
+        body.classList.toggle('hidden');
+        if (chev) chev.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    }
+
+    function openDominoModal() {
+        const m = document.getElementById('dominoModal');
+        if (m) { m.classList.remove('hidden'); m.style.display = 'flex'; }
+    }
+    function closeDominoModal() {
+        const m = document.getElementById('dominoModal');
+        if (m) { m.classList.add('hidden'); m.style.display = ''; }
+    }
+    function previewDominoPanel() {
+        const tarih = document.getElementById('domino-tatil-select').value;
+        document.getElementById('domino-tatil-hidden').value = tarih;
+        const btn = document.getElementById('domino-submit-btn');
+        const preview = document.getElementById('domino-preview-list');
+        if (!tarih) { btn.disabled = true; preview.classList.add('hidden'); return; }
+        fetch(`/hoca/domino_preview?bolum_id={{ secili_bolum_id }}&tatil_tarihi=${tarih}`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('domino-preview-items').innerHTML = data.map(s =>
+                    `<div class="flex justify-between py-0.5"><span class="font-bold text-gray-700">${s.haftano}. Hafta — ${s.konuadi}</span><span class="text-gray-500">${s.sunumtarihi}</span></div>`
+                ).join('');
+                preview.classList.remove('hidden');
+                btn.disabled = false;
+            });
     }
 
     let currentMoveHafta = 0;
