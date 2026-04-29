@@ -137,6 +137,19 @@ def admin_panel():
         )
     panel_bolumler = cursor.fetchall()
 
+    # Vize/tatil haftalarında slot yoksa boş header için placeholder satırı ekle
+    slot_hafta_nos = {s['HaftaNo'] for s in schedule_data}
+    for hafta_no in sorted((vize_haftalar | tatilkaydir_haftalar) - slot_hafta_nos):
+        schedule_data.append({
+            'SunumID': None, 'HaftaNo': hafta_no, 'SunumTarihi': None,
+            'KonuAdi': None, 'Basvurular': [], 'Atananlar': [], 'Onaylanan': False,
+            'OnaylananBasvuruID': None,
+            'SoruSayisi': 0,
+            'SoruOzet': {'toplam': 0, 'sunan_onayli': 0, 'hakem_onayli': 0, 'tam_onayli': 0},
+            'Dosyalar': [],
+        })
+    schedule_data.sort(key=lambda x: x['HaftaNo'])
+
     return render_template('admin/admin_panel.html',
                            schedule_data=schedule_data,
                            selected_tur=selected_tur,

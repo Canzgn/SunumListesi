@@ -206,6 +206,7 @@
     {% if sunum.HaftaNo != ns.last_week %}
     <div id="hafta-{{ sunum.HaftaNo }}" class="{% if sunum.HaftaNo in vize_haftalar|default([]) %}bg-gradient-to-r from-purple-700 to-violet-700 shadow-lg shadow-purple-900/30{% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}bg-gradient-to-r from-orange-600 to-red-600 shadow-lg shadow-orange-900/30{% else %}bg-slate-800{% endif %} text-white px-6 py-2 rounded-xl font-black text-xs mt-8 tracking-widest uppercase italic flex items-center gap-3 flex-wrap">
         {{ sunum.HaftaNo }}. HAFTA
+        {% if not sunum.SunumID %}{% if sunum.HaftaNo in vize_haftalar %}&mdash; VİZE HAFTASI{% elif sunum.HaftaNo in tatilkaydir_haftalar %}&mdash; TATİL KAYDIRMASI{% endif %}{% endif %}
         {% if sunum.SunumTarihi %}
         <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
         {% if sunum.SunumTarihi in tatil_tarihleri|default([]) %}
@@ -268,6 +269,7 @@
     {% set ns.last_week = sunum.HaftaNo %}
     {% endif %}
 
+    {% if sunum.SunumID %}
     <div id="sunum-{{ sunum.SunumID }}" class="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 transition
                     {% if sunum.Onaylanan %}border-emerald-400{% else %}border-gray-200{% endif %}">
 
@@ -391,6 +393,7 @@
         </div>
 
     </div>
+    {% endif %}{# end sunum.SunumID #}
     {% endfor %}
 
     {% else %}
