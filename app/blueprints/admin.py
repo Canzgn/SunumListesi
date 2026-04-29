@@ -12,7 +12,17 @@ from psycopg2.extras import execute_values
 from db_manager import get_db_connection
 from app.decorators import admin_required
 from app.utils import get_admin_bolum_ids, get_admin_allowed_turs, log_islem, try_send_email
-from app.helpers import build_schedule_data
+from app.helpers import (
+    build_schedule_data,
+    resolve_hafta_tarihi,
+    shift_bolum_forward,
+    shift_bolum_backward,
+    cross_bolum_vize_apply,
+    cross_bolum_tatil_apply,
+    cross_bolum_vize_remove,
+    cross_bolum_tatil_remove,
+    get_donem_bolum_ids,
+)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -151,6 +161,31 @@ def admin_panel():
         )
     panel_bolumler = cursor.fetchall()
 
+    # Otomatik yerleştirme: bölüm bazlı overflow sayıları + aktif snapshot
+    from app.helpers import auto_fit_active_snapshot
+    panel_bolum_ids = [b.BolumID for b in panel_bolumler]
+    overflow_per_bolum = {}
+    autofit_per_bolum = {}
+    if panel_bolum_ids:
+        cursor.execute("""
+            SELECT sp.BolumID, COUNT(*) AS cnt FROM SunumProgrami sp
+            JOIN Bolumler b ON sp.BolumID = b.BolumID
+            JOIN Donemler d ON b.DonemID = d.DonemID
+            WHERE d.donembitis IS NOT NULL AND sp.SunumTarihi > d.donembitis
+              AND sp.SunumTarihi IS NOT NULL AND sp.BolumID = ANY(%s)
+            GROUP BY sp.BolumID
+        """, (panel_bolum_ids,))
+        for r in cursor.fetchall():
+            overflow_per_bolum[r.BolumID] = r.cnt
+        for bid in panel_bolum_ids:
+            snap = auto_fit_active_snapshot(cursor, bid)
+            if snap:
+                autofit_per_bolum[bid] = {
+                    'gecmisid': snap.gecmisid,
+                    'olusturma_tarihi': snap.olusturma_tarihi,
+                    'islemyapan': snap.islemyapan,
+                }
+
     # Vize/tatil haftalarında slot yoksa boş header için placeholder satırı ekle
     slot_hafta_nos = {s['HaftaNo'] for s in schedule_data}
     for hafta_no in sorted((vize_haftalar | tatilkaydir_haftalar) - slot_hafta_nos):
@@ -194,7 +229,9 @@ def admin_panel():
                            tatil_cadisi_haftalari=tatil_cadisi_haftalari,
                            tatil_gunleri=tatil_gunleri,
                            tum_konular=tum_konular,
-                           panel_bolumler=panel_bolumler)
+                           panel_bolumler=panel_bolumler,
+                           overflow_per_bolum=overflow_per_bolum,
+                           autofit_per_bolum=autofit_per_bolum)
 
 
 # --- ÖĞRENCİ YÖNETİMİ ---
@@ -227,20 +264,15 @@ def admin_panel_vize_ekle():
     aciklama_v = request.form.get('aciklama', '').strip() or None
     islemyapan_v = session.get('admin_name', 'Admin')[:150]
     hafta_tarihi_str_v = request.form.get('hafta_tarihi', '').strip()
-    hafta_tarihi_v = hafta_tarihi_str_v if hafta_tarihi_str_v else None
-    for bid in bolum_ids:
-        cursor.execute(
-            "UPDATE SunumProgrami SET haftano = haftano+1, "
-            "sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL THEN sunumtarihi + make_interval(days=>7) ELSE NULL END "
-            "WHERE bolumid=%s AND haftano >= %s",
-            (bid, hafta_no)
-        )
-        cursor.execute(
-            "INSERT INTO VizeHaftalari (bolumid, haftano, aciklama, islemyapan, hafta_tarihi) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
-            (bid, hafta_no, aciklama_v, islemyapan_v, hafta_tarihi_v)
-        )
+    # Tarih: form > ilk bölümün aynı hafta_no slotundan
+    hafta_tarihi_v = resolve_hafta_tarihi(cursor, bolum_ids[0], hafta_no, hafta_tarihi_str_v)
+    if hafta_tarihi_v is None:
+        flash('Vize haftası için tarih belirlenemedi.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    # Tüm yetkili bölümleri aynı hafta tarihinde tarihe göre kaydır
+    applied = cross_bolum_vize_apply(cursor, bolum_ids, hafta_tarihi_v, aciklama_v, islemyapan_v)
     conn.commit()
-    flash(f'{hafta_no}. Hafta vize haftası olarak işaretlendi.', 'success')
+    flash(f'Vize haftası ({hafta_tarihi_v.strftime("%d.%m.%Y")}) {len(applied)} bölümde işaretlendi.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 
@@ -267,31 +299,26 @@ def admin_panel_vize_sil():
     if not bolum_ids:
         flash('Bölüm bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
-    etkilenen = 0
-    actually_deleted = False
-    for bid in bolum_ids:
-        cursor.execute("DELETE FROM VizeHaftalari WHERE bolumid=%s AND haftano = %s", (bid, hafta_no))
-        if cursor.rowcount == 0:
-            continue
-        actually_deleted = True
-        cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
-        etkilenen += cursor.fetchone()[0]
-        cursor.execute("""
-            UPDATE SunumProgrami
-            SET haftano = haftano - 1,
-                sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
-                                   THEN sunumtarihi - make_interval(days => 7)
-                                   ELSE NULL END
-            WHERE bolumid=%s AND haftano > %s
-        """, (bid, hafta_no))
-        cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
-        cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
-    if not actually_deleted:
+    hafta_tarihi_str = request.form.get('hafta_tarihi', '').strip()
+    hafta_tarihi = resolve_hafta_tarihi(cursor, bolum_ids[0], hafta_no, hafta_tarihi_str)
+    if hafta_tarihi is None:
+        # Eski kayıtlar için fallback: bu hafta_no'da kayıtlı ilk vize hafta_tarihi'sini al
+        cursor.execute(
+            "SELECT hafta_tarihi FROM VizeHaftalari WHERE bolumid = ANY(%s) AND haftano = %s AND hafta_tarihi IS NOT NULL LIMIT 1",
+            (bolum_ids, hafta_no)
+        )
+        r = cursor.fetchone()
+        hafta_tarihi = r.hafta_tarihi if r else None
+    if hafta_tarihi is None:
+        flash('Vize haftası tarihi belirlenemedi (eski kayıt olabilir).', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    removed = cross_bolum_vize_remove(cursor, bolum_ids, hafta_tarihi)
+    if not removed:
         conn.rollback()
-        flash(f'{hafta_no}. Hafta için vize kaydı bulunamadı.', 'error')
+        flash('Vize kaydı bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
     conn.commit()
-    flash(f'{hafta_no}. Hafta vize haftası geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
+    flash(f'Vize haftası ({hafta_tarihi.strftime("%d.%m.%Y")}) {len(removed)} bölümden geri alındı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 
@@ -315,23 +342,23 @@ def admin_panel_tatil_kaydir():
     else:
         cursor.execute("SELECT BolumID FROM Bolumler WHERE OgretimTuru = %s", (tur,))
     bolum_ids = [r.BolumID for r in cursor.fetchall()]
+    if not bolum_ids:
+        flash('Bölüm bulunamadı.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
     aciklama_t = request.form.get('aciklama', '').strip() or None
     islemyapan_t = session.get('admin_name', 'Admin')[:150]
     hafta_tarihi_str_t = request.form.get('hafta_tarihi', '').strip()
-    hafta_tarihi_t = hafta_tarihi_str_t if hafta_tarihi_str_t else None
-    for bid in bolum_ids:
-        cursor.execute(
-            "UPDATE SunumProgrami SET haftano = haftano+1, "
-            "sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL THEN sunumtarihi + make_interval(days=>7) ELSE NULL END "
-            "WHERE bolumid=%s AND haftano >= %s",
-            (bid, hafta_no)
-        )
-        cursor.execute(
-            "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano, aciklama, islemyapan, hafta_tarihi) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
-            (bid, hafta_no, aciklama_t, islemyapan_t, hafta_tarihi_t)
-        )
+    holiday_date = resolve_hafta_tarihi(cursor, bolum_ids[0], hafta_no, hafta_tarihi_str_t)
+    if holiday_date is None:
+        flash('Tatil tarihi belirlenemedi.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    applied = cross_bolum_tatil_apply(cursor, bolum_ids, holiday_date, aciklama_t, islemyapan_t)
     conn.commit()
-    flash(f'{hafta_no}. Hafta tatil kaydırması uygulandı.', 'success')
+    flash(
+        f'Tatil kaydırması ({holiday_date.strftime("%d.%m.%Y")}) — o haftada sunumu olan '
+        f'{len(applied)} bölümde tüm hafta bir hafta ileri kaydırıldı.',
+        'success'
+    )
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 
@@ -358,31 +385,25 @@ def admin_panel_tatil_kaydir_sil():
     if not bolum_ids:
         flash('Bölüm bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
-    etkilenen = 0
-    actually_deleted = False
-    for bid in bolum_ids:
-        cursor.execute("DELETE FROM TatilKaydirmaHaftalari WHERE bolumid=%s AND haftano = %s", (bid, hafta_no))
-        if cursor.rowcount == 0:
-            continue
-        actually_deleted = True
-        cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
-        etkilenen += cursor.fetchone()[0]
-        cursor.execute("""
-            UPDATE SunumProgrami
-            SET haftano = haftano - 1,
-                sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
-                                   THEN sunumtarihi - make_interval(days => 7)
-                                   ELSE NULL END
-            WHERE bolumid=%s AND haftano > %s
-        """, (bid, hafta_no))
-        cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
-        cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
-    if not actually_deleted:
+    hafta_tarihi_str = request.form.get('hafta_tarihi', '').strip()
+    holiday_date = resolve_hafta_tarihi(cursor, bolum_ids[0], hafta_no, hafta_tarihi_str)
+    if holiday_date is None:
+        cursor.execute(
+            "SELECT hafta_tarihi FROM TatilKaydirmaHaftalari WHERE bolumid = ANY(%s) AND haftano = %s AND hafta_tarihi IS NOT NULL LIMIT 1",
+            (bolum_ids, hafta_no)
+        )
+        r = cursor.fetchone()
+        holiday_date = r.hafta_tarihi if r else None
+    if holiday_date is None:
+        flash('Tatil tarihi belirlenemedi (eski kayıt olabilir).', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    removed = cross_bolum_tatil_remove(cursor, bolum_ids, holiday_date)
+    if not removed:
         conn.rollback()
-        flash(f'{hafta_no}. Hafta için tatil kaydırma kaydı bulunamadı.', 'error')
+        flash('Tatil kayıt bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
     conn.commit()
-    flash(f'{hafta_no}. Hafta tatil kaydırması geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
+    flash(f'Tatil kaydırması ({holiday_date.strftime("%d.%m.%Y")}) {len(removed)} bölümden geri alındı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 
@@ -427,6 +448,63 @@ def admin_panel_domino_uygula():
         )
     conn.commit()
     flash(f'{etkilenen} slot {shift_days} gün ileri kaydırıldı.', 'success')
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_auto_fit_uygula', methods=['POST'])
+@admin_required
+def admin_panel_auto_fit_uygula():
+    from app.helpers import auto_fit_apply
+    tur = request.form.get('tur', 'Örgün')
+    bolum_id = request.form.get('bolum_id', '')
+    if not bolum_id:
+        flash('Bölüm seçilmedi.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    # Yetki: admin sadece sorumlu olduğu bölümlerde uygulayabilir
+    admin_bolum_ids = get_admin_bolum_ids()
+    if admin_bolum_ids is not None and int(bolum_id) not in admin_bolum_ids:
+        flash('Bu bölüm üzerinde yetkiniz yok.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    islemyapan = session.get('admin_name', 'Admin')[:150]
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    gid, info = auto_fit_apply(cursor, bolum_id, islemyapan)
+    if gid is None:
+        conn.rollback()
+        flash(info.get('error', 'Otomatik yerleştirme yapılamadı.'), 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    conn.commit()
+    flash(
+        f'Otomatik yerleştirme uygulandı: {info["overflow_count"]} sarkık konu '
+        f'{info["weeks_used"]} haftaya dengeli dağıtıldı (haftada {info["min_per_week"]}-{info["max_per_week"]} sunum).',
+        'success'
+    )
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_auto_fit_geri_al', methods=['POST'])
+@admin_required
+def admin_panel_auto_fit_geri_al():
+    from app.helpers import auto_fit_undo
+    tur = request.form.get('tur', 'Örgün')
+    bolum_id = request.form.get('bolum_id', '')
+    gecmisid = request.form.get('gecmisid', '')
+    if not bolum_id or not gecmisid:
+        flash('Geçersiz parametreler.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    admin_bolum_ids = get_admin_bolum_ids()
+    if admin_bolum_ids is not None and int(bolum_id) not in admin_bolum_ids:
+        flash('Bu bölüm üzerinde yetkiniz yok.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    ok = auto_fit_undo(cursor, gecmisid, bolum_id)
+    if not ok:
+        conn.rollback()
+        flash('Geri alma kaydı bulunamadı veya bu bölüme ait değil.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    conn.commit()
+    flash('Otomatik yerleştirme geri alındı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 

@@ -47,7 +47,7 @@
     </div>
 
     {# TATİL VE TAKVİM DIŞI UYARILARI #}
-    {% if tatil_cadisi_sayisi > 0 or takvim_disi_sayisi > 0 %}
+    {% if tatil_cadisi_sayisi > 0 or takvim_disi_sayisi > 0 or autofit_per_bolum %}
     <div class="space-y-2">
         {% if tatil_cadisi_sayisi > 0 %}
         <div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between gap-4">
@@ -65,16 +65,61 @@
         </div>
         {% endif %}
         {% if takvim_disi_sayisi > 0 %}
-        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-            <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
-            <div>
-                <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
-                <p class="text-xs text-amber-600">
-                    19 ve 26 Haziran — 1 Mayıs + Kurban Bayramı domino kaymasından zorunlu.
-                    Öğrenci ve idareyi bilgilendirin.
-                </p>
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div class="flex items-center gap-3 mb-2">
+                <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
+                    <p class="text-xs text-amber-600">Konular takvime sığmıyor — bölüm bazında otomatik yerleştirebilirsiniz. (Geri alınabilir)</p>
+                </div>
             </div>
+            {% if overflow_per_bolum %}
+            <div class="flex flex-wrap gap-2 mt-3">
+                {% for b in panel_bolumler %}
+                {% if overflow_per_bolum.get(b.BolumID) %}
+                <form action="{{ url_for('admin.admin_panel_auto_fit_uygula') }}" method="POST"
+                      onsubmit="return confirm('{{ b.BolumAdi }} bölümündeki sarkık {{ overflow_per_bolum[b.BolumID] }} konu, sıralarını koruyarak mevcut haftalara dağıtılacak. Devam edilsin mi?\n\nBu işlem geri alınabilir.')">
+                    <input type="hidden" name="bolum_id" value="{{ b.BolumID }}">
+                    <input type="hidden" name="tur" value="{{ selected_tur }}">
+                    <button type="submit"
+                        class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        {{ b.BolumAdi }} ({{ overflow_per_bolum[b.BolumID] }})
+                    </button>
+                </form>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
+        {% endif %}
+        {% if autofit_per_bolum %}
+        {% for b in panel_bolumler %}
+        {% set _af = autofit_per_bolum.get(b.BolumID) %}
+        {% if _af %}
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-emerald-700">{{ b.BolumAdi }} — Otomatik yerleştirme uygulandı</p>
+                    <p class="text-xs text-emerald-600">
+                        {{ _af.olusturma_tarihi.strftime('%d.%m.%Y %H:%M') }} — {{ _af.islemyapan or 'Sistem' }}
+                    </p>
+                </div>
+            </div>
+            <form action="{{ url_for('admin.admin_panel_auto_fit_geri_al') }}" method="POST"
+                  onsubmit="return confirm('Otomatik yerleştirme geri alınsın mı? Slotlar önceki konumlarına geri dönecek.')">
+                <input type="hidden" name="bolum_id" value="{{ b.BolumID }}">
+                <input type="hidden" name="gecmisid" value="{{ _af.gecmisid }}">
+                <input type="hidden" name="tur" value="{{ selected_tur }}">
+                <button type="submit"
+                    class="shrink-0 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-black px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> Geri Al
+                </button>
+            </form>
+        </div>
+        {% endif %}
+        {% endfor %}
         {% endif %}
     </div>
     {% endif %}
@@ -216,27 +261,30 @@
         {% if _tmeta and _tmeta.aciklama %}<span class="font-semibold normal-case not-italic tracking-normal text-orange-200"> — {{ _tmeta.aciklama }}</span>{% endif %}
         {% if _tmeta and _tmeta.islemyapan %}<span class="font-normal text-[9px] normal-case not-italic tracking-normal text-orange-300 opacity-80">({{ _tmeta.islemyapan }})</span>{% endif %}
         {% endif %}
-        {% if sunum.SunumTarihi %}
-        <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
-        {% if sunum.SunumTarihi in tatil_tarihleri %}
+        {% set _hdt = sunum.SunumTarihi or hafta_tarih_map.get(sunum.HaftaNo) %}
+        {% if _hdt %}
+        <span class="text-slate-300 font-bold normal-case not-italic">— {{ _hdt.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][_hdt.weekday()] }}</span>
+        {% if _hdt in tatil_tarihleri %}
         <span class="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-triangle-exclamation"></i> Tatil</span>
-        {% elif akademik_bitis and sunum.SunumTarihi > akademik_bitis %}
+        {% elif akademik_bitis and _hdt > akademik_bitis %}
         <span class="text-[9px] font-black bg-amber-400 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-calendar-xmark"></i> Takvim Dışı</span>
         {% endif %}
         {% endif %}
         {# ── HAFTA YÖNETİM BUTONLARI (Admin) ── #}
         {% if sunum.HaftaNo in vize_haftalar|default([]) %}
-        <form action="/admin/panel_vize_sil" method="POST" onsubmit="return confirm('Vize haftası geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.')">
+        <form action="/admin/panel_vize_sil" method="POST" onsubmit="return confirm('Vize haftası geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.\nAynı dönemde bu vize ile etkilenen diğer bölümler de geri alınacak.')">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
             <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
                 <i class="fa-solid fa-rotate-left"></i> Geri Al
             </button>
         </form>
         {% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}
-        <form action="/admin/panel_tatil_kaydir_sil" method="POST" onsubmit="return confirm('Tatil kaydırması geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.')">
+        <form action="/admin/panel_tatil_kaydir_sil" method="POST" onsubmit="return confirm('Tatil kaydırması geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.\nAynı dönemde bu tatille etkilenen diğer bölümler de geri alınacak.')">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
             <button type="submit" class="text-[9px] font-black text-orange-200 hover:text-white border border-orange-400 hover:bg-orange-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
                 <i class="fa-solid fa-rotate-left"></i> Geri Al
             </button>
@@ -246,7 +294,7 @@
         <form action="/admin/panel_tatil_kaydir" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılsın mı?')">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
-            <input type="hidden" name="hafta_tarihi" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}">
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
             <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
                 <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
                     class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-red-400 outline-none w-32 placeholder-slate-400">
@@ -256,24 +304,19 @@
             </div>
         </form>
         {% endif %}
-        <form action="/admin/panel_vize_ekle" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta vize haftası olarak işaretlensin mi?\nBu hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılacak.')">
+        <form action="/admin/panel_vize_ekle" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta vize haftası olarak işaretlensin mi?\nBu hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılacak.\nAynı dönemdeki diğer bölümler de aynı haftada kaydırılacak.')">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
-            <input type="hidden" name="hafta_tarihi" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}">
-            <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
-                <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
-                    class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-purple-400 outline-none w-32 placeholder-slate-400">
-                <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1">
-                    <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
-                </button>
-            </div>
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
+            <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1 normal-case not-italic tracking-normal">
+                <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
+            </button>
         </form>
         {% endif %}
         <form action="/admin/update_hafta_tarihi" method="POST" class="ml-auto flex items-center gap-2 normal-case not-italic tracking-normal">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
-            {% set _dt = sunum.SunumTarihi or hafta_tarih_map.get(sunum.HaftaNo) %}
-            <input type="date" name="yeni_tarih" value="{{ _dt.strftime('%Y-%m-%d') if _dt else '' }}"
+            <input type="date" name="yeni_tarih" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}"
                 class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 outline-none cursor-pointer hover:border-blue-400 transition"
                 onchange="this.form.submit()" title="Hafta tarihini değiştir">
         </form>

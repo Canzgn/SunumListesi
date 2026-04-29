@@ -131,14 +131,70 @@
         </div>
         {% endif %}
         {% if takvim_disi_sayisi > 0 %}
-        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-            <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
-            <div>
-                <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
-                <p class="text-xs text-amber-600">Öğrenci ve idareyi bilgilendirin.</p>
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-calendar-xmark text-amber-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-amber-700">{{ takvim_disi_sayisi }} slot akademik takvim bitişini aşıyor</p>
+                    <p class="text-xs text-amber-600">Konular takvime sığmıyor — otomatik yerleştirmek ister misiniz? (Geri alınabilir)</p>
+                </div>
             </div>
+            <form action="{{ url_for('hoca.hoca_auto_fit_uygula') }}" method="POST"
+                  onsubmit="return confirm('Sarkık konular sıralarını koruyarak mevcut haftalara dağıtılacak. Devam edilsin mi?\n\nBu işlem geri alınabilir.')">
+                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                <input type="hidden" name="next" value="sunum_panel">
+                <button type="submit"
+                    class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black px-4 py-2 rounded-xl transition flex items-center gap-1">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Otomatik Yerleştir
+                </button>
+            </form>
         </div>
         {% endif %}
+        {% if active_autofit %}
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
+                <div>
+                    <p class="text-sm font-black text-emerald-700">Otomatik yerleştirme uygulandı</p>
+                    <p class="text-xs text-emerald-600">
+                        {{ active_autofit.olusturma_tarihi.strftime('%d.%m.%Y %H:%M') }} — {{ active_autofit.islemyapan or 'Sistem' }}
+                    </p>
+                </div>
+            </div>
+            <form action="{{ url_for('hoca.hoca_auto_fit_geri_al') }}" method="POST"
+                  onsubmit="return confirm('Otomatik yerleştirme geri alınsın mı? Slotlar önceki konumlarına geri dönecek.')">
+                <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+                <input type="hidden" name="gecmisid" value="{{ active_autofit.gecmisid }}">
+                <input type="hidden" name="next" value="sunum_panel">
+                <button type="submit"
+                    class="shrink-0 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-black px-4 py-2 rounded-xl transition flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> Geri Al
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% elif active_autofit %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
+            <div>
+                <p class="text-sm font-black text-emerald-700">Otomatik yerleştirme uygulandı</p>
+                <p class="text-xs text-emerald-600">
+                    {{ active_autofit.olusturma_tarihi.strftime('%d.%m.%Y %H:%M') }} — {{ active_autofit.islemyapan or 'Sistem' }}
+                </p>
+            </div>
+        </div>
+        <form action="{{ url_for('hoca.hoca_auto_fit_geri_al') }}" method="POST"
+              onsubmit="return confirm('Otomatik yerleştirme geri alınsın mı? Slotlar önceki konumlarına geri dönecek.')">
+            <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
+            <input type="hidden" name="gecmisid" value="{{ active_autofit.gecmisid }}">
+            <input type="hidden" name="next" value="sunum_panel">
+            <button type="submit"
+                class="shrink-0 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-black px-4 py-2 rounded-xl transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate-left"></i> Geri Al
+            </button>
+        </form>
     </div>
     {% endif %}
 
@@ -217,11 +273,12 @@
         {% if _tmeta and _tmeta.aciklama %}<span class="font-semibold normal-case not-italic tracking-normal text-orange-200"> — {{ _tmeta.aciklama }}</span>{% endif %}
         {% if _tmeta and _tmeta.islemyapan %}<span class="font-normal text-[9px] normal-case not-italic tracking-normal text-orange-300 opacity-80">({{ _tmeta.islemyapan }})</span>{% endif %}
         {% endif %}
-        {% if sunum.SunumTarihi %}
-        <span class="text-slate-300 font-bold normal-case not-italic">— {{ sunum.SunumTarihi.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][sunum.SunumTarihi.weekday()] }}</span>
-        {% if sunum.SunumTarihi in tatil_tarihleri|default([]) %}
+        {% set _hdt = sunum.SunumTarihi or hafta_tarih_map.get(sunum.HaftaNo) %}
+        {% if _hdt %}
+        <span class="text-slate-300 font-bold normal-case not-italic">— {{ _hdt.strftime('%d.%m.%Y') }} {{ ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'][_hdt.weekday()] }}</span>
+        {% if _hdt in tatil_tarihleri|default([]) %}
         <span class="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-triangle-exclamation"></i> Tatil</span>
-        {% elif akademik_bitis and sunum.SunumTarihi > akademik_bitis %}
+        {% elif akademik_bitis and _hdt > akademik_bitis %}
         <span class="text-[9px] font-black bg-amber-400 text-white px-2 py-0.5 rounded normal-case not-italic"><i class="fa-solid fa-calendar-xmark"></i> Takvim Dışı</span>
         {% endif %}
         {% endif %}
@@ -254,7 +311,7 @@
             <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="next" value="sunum_panel">
-            <input type="hidden" name="hafta_tarihi" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}">
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
             <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
                 <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
                     class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-red-400 outline-none w-32 placeholder-slate-400">
@@ -264,25 +321,20 @@
             </div>
         </form>
         {% endif %}
-        <form action="/hoca/vize_ekle" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta vize haftası olarak işaretlensin mi?\nBu hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılacak.')">
+        <form action="/hoca/vize_ekle" method="POST" onsubmit="return confirm('{{ sunum.HaftaNo }}. Hafta vize haftası olarak işaretlensin mi?\nBu hafta ve sonraki tüm haftalar 1 hafta ileri kaydırılacak.\nAynı dönemdeki tüm bölümler de aynı haftada kaydırılacak.')">
             <input type="hidden" name="bolum_id" value="{{ secili_bolum_id }}">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="next" value="sunum_panel">
-            <input type="hidden" name="hafta_tarihi" value="{{ sunum.SunumTarihi.strftime('%Y-%m-%d') if sunum.SunumTarihi else '' }}">
-            <div class="flex items-center gap-1 normal-case not-italic tracking-normal">
-                <input type="text" name="aciklama" placeholder="Neden? (işteğe bağlı)" maxlength="255"
-                    class="bg-slate-700 text-white text-[9px] px-2 py-0.5 rounded border border-purple-400 outline-none w-32 placeholder-slate-400">
-                <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1">
-                    <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
-                </button>
-            </div>
+            <input type="hidden" name="hafta_tarihi" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}">
+            <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition flex items-center gap-1 normal-case not-italic tracking-normal">
+                <i class="fa-solid fa-graduation-cap"></i> Vize İşaretle
+            </button>
         </form>
         {% endif %}
         <form action="/admin/update_hafta_tarihi" method="POST" class="ml-auto flex items-center gap-2 normal-case not-italic tracking-normal">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ secili_bolum.OgretimTuru }}">
-            {% set _dt = sunum.SunumTarihi or hafta_tarih_map.get(sunum.HaftaNo) %}
-            <input type="date" name="yeni_tarih" value="{{ _dt.strftime('%Y-%m-%d') if _dt else '' }}"
+            <input type="date" name="yeni_tarih" value="{{ _hdt.strftime('%Y-%m-%d') if _hdt else '' }}"
                 class="bg-slate-700 text-white text-xs px-2 py-1 rounded-lg border border-slate-600 outline-none cursor-pointer hover:border-blue-400 transition"
                 onchange="this.form.submit()" title="Hafta tarihini değiştir">
         </form>
