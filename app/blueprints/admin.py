@@ -109,6 +109,34 @@ def admin_panel():
         """, (selected_tur,))
     tatilkaydir_haftalar = {r.haftano for r in cursor.fetchall()}
 
+    # Tatil çakışması olan hafta numaraları
+    cursor.execute("""
+        SELECT DISTINCT sp.haftano FROM SunumProgrami sp
+        JOIN TatilGunleri tg ON sp.sunumtarihi = tg.tarih
+        JOIN Bolumler b ON b.bolumid = sp.bolumid
+        WHERE b.donemid = tg.donemid AND sp.ogretimturu = %s
+    """, (selected_tur,))
+    tatil_cadisi_haftalari = {r.haftano for r in cursor.fetchall()}
+
+    cursor.execute("SELECT tatilid, tarih, aciklama, eylemtipi FROM TatilGunleri ORDER BY tarih")
+    tatil_gunleri = cursor.fetchall()
+
+    cursor.execute("SELECT KonuID, KonuAdi FROM Konular ORDER BY SiraNo, KonuAdi")
+    tum_konular = cursor.fetchall()
+
+    # Bolümler selected_tur için (yeni slot ekle formu)
+    if admin_bolum_ids:
+        cursor.execute(
+            "SELECT BolumID, BolumAdi FROM Bolumler WHERE BolumID = ANY(%s) AND OgretimTuru = %s ORDER BY BolumAdi",
+            (admin_bolum_ids, selected_tur)
+        )
+    else:
+        cursor.execute(
+            "SELECT BolumID, BolumAdi FROM Bolumler WHERE OgretimTuru = %s ORDER BY BolumAdi",
+            (selected_tur,)
+        )
+    panel_bolumler = cursor.fetchall()
+
     return render_template('admin/admin_panel.html',
                            schedule_data=schedule_data,
                            selected_tur=selected_tur,
@@ -120,7 +148,223 @@ def admin_panel():
                            tatil_tarihleri=tatil_tarihleri,
                            akademik_bitis=akademik_bitis,
                            vize_haftalar=vize_haftalar,
-                           tatilkaydir_haftalar=tatilkaydir_haftalar)
+                           tatilkaydir_haftalar=tatilkaydir_haftalar,
+                           tatil_cadisi_haftalari=tatil_cadisi_haftalari,
+                           tatil_gunleri=tatil_gunleri,
+                           tum_konular=tum_konular,
+                           panel_bolumler=panel_bolumler)
+
+
+# --- ÖĞRENCİ YÖNETİMİ ---
+
+# --- PANEL HAFTA YÖNETİM ROUTE'LARı (Vize/Tatil - Admin panel inline) ---
+
+@admin_bp.route('/panel_vize_ekle', methods=['POST'])
+@admin_required
+def admin_panel_vize_ekle():
+    tur = request.form.get('tur', 'Örgün')
+    hafta_no = request.form.get('hafta_no', '')
+    if not hafta_no or not hafta_no.isdigit():
+        flash('Geçersiz hafta numarası.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    hafta_no = int(hafta_no)
+    admin_bolum_ids = get_admin_bolum_ids()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if admin_bolum_ids:
+        cursor.execute(
+            "SELECT BolumID FROM Bolumler WHERE BolumID = ANY(%s) AND OgretimTuru = %s",
+            (admin_bolum_ids, tur)
+        )
+    else:
+        cursor.execute("SELECT BolumID FROM Bolumler WHERE OgretimTuru = %s", (tur,))
+    bolum_ids = [r.BolumID for r in cursor.fetchall()]
+    if not bolum_ids:
+        flash('Bu tür için bölüm bulunamadı.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    for bid in bolum_ids:
+        cursor.execute(
+            "UPDATE SunumProgrami SET haftano = haftano+1, "
+            "sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL THEN sunumtarihi + make_interval(days=>7) ELSE NULL END "
+            "WHERE bolumid=%s AND haftano >= %s",
+            (bid, hafta_no)
+        )
+        cursor.execute(
+            "INSERT INTO VizeHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (bid, hafta_no)
+        )
+    conn.commit()
+    flash(f'{hafta_no}. Hafta vize haftası olarak işaretlendi.', 'success')
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_vize_sil', methods=['POST'])
+@admin_required
+def admin_panel_vize_sil():
+    tur = request.form.get('tur', 'Örgün')
+    hafta_no = request.form.get('hafta_no', '')
+    if not hafta_no or not hafta_no.isdigit():
+        flash('Geçersiz hafta numarası.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    hafta_no = int(hafta_no)
+    admin_bolum_ids = get_admin_bolum_ids()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if admin_bolum_ids:
+        cursor.execute(
+            "DELETE FROM VizeHaftalari WHERE bolumid = ANY(%s) AND haftano = %s",
+            (admin_bolum_ids, hafta_no)
+        )
+    else:
+        cursor.execute(
+            "DELETE FROM VizeHaftalari WHERE haftano = %s AND bolumid IN (SELECT BolumID FROM Bolumler WHERE OgretimTuru=%s)",
+            (hafta_no, tur)
+        )
+    conn.commit()
+    flash(f'{hafta_no}. Hafta vize etiketi kaldırıldı. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_tatil_kaydir', methods=['POST'])
+@admin_required
+def admin_panel_tatil_kaydir():
+    tur = request.form.get('tur', 'Örgün')
+    hafta_no = request.form.get('hafta_no', '')
+    if not hafta_no or not hafta_no.isdigit():
+        flash('Geçersiz hafta numarası.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    hafta_no = int(hafta_no)
+    admin_bolum_ids = get_admin_bolum_ids()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if admin_bolum_ids:
+        cursor.execute(
+            "SELECT BolumID FROM Bolumler WHERE BolumID = ANY(%s) AND OgretimTuru = %s",
+            (admin_bolum_ids, tur)
+        )
+    else:
+        cursor.execute("SELECT BolumID FROM Bolumler WHERE OgretimTuru = %s", (tur,))
+    bolum_ids = [r.BolumID for r in cursor.fetchall()]
+    for bid in bolum_ids:
+        cursor.execute(
+            "UPDATE SunumProgrami SET haftano = haftano+1, "
+            "sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL THEN sunumtarihi + make_interval(days=>7) ELSE NULL END "
+            "WHERE bolumid=%s AND haftano >= %s",
+            (bid, hafta_no)
+        )
+        cursor.execute(
+            "INSERT INTO TatilKaydirmaHaftalari (bolumid, haftano) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (bid, hafta_no)
+        )
+    conn.commit()
+    flash(f'{hafta_no}. Hafta tatil kaydırması uygulandı.', 'success')
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_tatil_kaydir_sil', methods=['POST'])
+@admin_required
+def admin_panel_tatil_kaydir_sil():
+    tur = request.form.get('tur', 'Örgün')
+    hafta_no = request.form.get('hafta_no', '')
+    if not hafta_no or not hafta_no.isdigit():
+        flash('Geçersiz hafta numarası.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    hafta_no = int(hafta_no)
+    admin_bolum_ids = get_admin_bolum_ids()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if admin_bolum_ids:
+        cursor.execute(
+            "DELETE FROM TatilKaydirmaHaftalari WHERE bolumid = ANY(%s) AND haftano = %s",
+            (admin_bolum_ids, hafta_no)
+        )
+    else:
+        cursor.execute(
+            "DELETE FROM TatilKaydirmaHaftalari WHERE haftano = %s AND bolumid IN (SELECT BolumID FROM Bolumler WHERE OgretimTuru=%s)",
+            (hafta_no, tur)
+        )
+    conn.commit()
+    flash(f'{hafta_no}. Hafta tatil kaydırma etiketi kaldırıldı.', 'warning')
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_domino_uygula', methods=['POST'])
+@admin_required
+def admin_panel_domino_uygula():
+    from datetime import datetime as dt
+    tur = request.form.get('tur', 'Örgün')
+    tatil_tarihi_str = request.form.get('tatil_tarihi', '')
+    shift_days = int(request.form.get('shift_days', 7))
+    try:
+        tatil_tarihi = dt.strptime(tatil_tarihi_str, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        flash('Geçersiz tarih.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    admin_bolum_ids = get_admin_bolum_ids()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if admin_bolum_ids:
+        cursor.execute(
+            "SELECT COUNT(*) FROM SunumProgrami WHERE bolumid = ANY(%s) AND sunumtarihi >= %s AND sunumtarihi IS NOT NULL",
+            (admin_bolum_ids, tatil_tarihi)
+        )
+        etkilenen = cursor.fetchone()[0]
+        cursor.execute(
+            "UPDATE SunumProgrami SET sunumtarihi = sunumtarihi + make_interval(days=>%s) "
+            "WHERE bolumid = ANY(%s) AND sunumtarihi >= %s AND sunumtarihi IS NOT NULL",
+            (shift_days, admin_bolum_ids, tatil_tarihi)
+        )
+    else:
+        cursor.execute(
+            "SELECT COUNT(*) FROM SunumProgrami sp JOIN Bolumler b ON sp.bolumid=b.bolumid "
+            "WHERE b.ogretimturu=%s AND sp.sunumtarihi >= %s AND sp.sunumtarihi IS NOT NULL",
+            (tur, tatil_tarihi)
+        )
+        etkilenen = cursor.fetchone()[0]
+        cursor.execute(
+            "UPDATE SunumProgrami sp SET sunumtarihi = sunumtarihi + make_interval(days=>%s) "
+            "FROM Bolumler b WHERE sp.bolumid=b.bolumid AND b.ogretimturu=%s "
+            "AND sp.sunumtarihi >= %s AND sp.sunumtarihi IS NOT NULL",
+            (shift_days, tur, tatil_tarihi)
+        )
+    conn.commit()
+    flash(f'{etkilenen} slot {shift_days} gün ileri kaydırıldı.', 'success')
+    return redirect(url_for('admin.admin_panel', tur=tur))
+
+
+@admin_bp.route('/panel_sunum_ekle', methods=['POST'])
+@admin_required
+def admin_panel_sunum_ekle():
+    from datetime import timedelta
+    tur = request.form.get('tur', 'Örgün')
+    bolum_id = request.form.get('bolum_id', '')
+    konu_id = request.form.get('konu_id', '').strip()
+    hafta_no = request.form.get('hafta_no', '').strip()
+    if not konu_id or not hafta_no.isdigit() or not bolum_id:
+        flash('Konu, hafta numarası veya bölüm geçersiz.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT OgretimTuru FROM Bolumler WHERE BolumID=%s", (bolum_id,))
+    b = cursor.fetchone()
+    ogretim_turu = b.OgretimTuru if b else tur
+    cursor.execute(
+        "INSERT INTO SunumProgrami (KonuID, OgretimTuru, HaftaNo, BolumID) VALUES (%s,%s,%s,%s) RETURNING SunumID",
+        (konu_id, ogretim_turu, int(hafta_no), bolum_id)
+    )
+    new_row = cursor.fetchone()
+    cursor.execute(
+        "SELECT SunumTarihi FROM SunumProgrami WHERE BolumID=%s AND HaftaNo<%s AND SunumTarihi IS NOT NULL ORDER BY HaftaNo DESC LIMIT 1",
+        (bolum_id, int(hafta_no))
+    )
+    prev = cursor.fetchone()
+    if prev and prev.SunumTarihi:
+        from datetime import timedelta as td
+        cursor.execute("UPDATE SunumProgrami SET SunumTarihi=%s WHERE SunumID=%s",
+                       (prev.SunumTarihi + td(weeks=1), new_row.SunumID))
+    conn.commit()
+    flash('Sunum slotu eklendi.', 'success')
+    return redirect(url_for('admin.admin_panel', tur=tur))
 
 
 # --- ÖĞRENCİ YÖNETİMİ ---
