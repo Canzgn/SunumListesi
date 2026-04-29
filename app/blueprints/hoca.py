@@ -1262,12 +1262,36 @@ def hoca_vize_sil():
     vize_id = request.form.get('vize_id', '')
     if not vize_id:
         flash('Geçersiz vize ID.', 'error')
-        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+        return _panel_redir(bolum_id, next_page)
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT bolumid, haftano FROM VizeHaftalari WHERE vizeid=%s", (vize_id,))
+    row = cursor.fetchone()
+    if not row:
+        flash('Kayıt bulunamadı.', 'error')
+        return _panel_redir(bolum_id, next_page)
+    hafta_no = row.haftano
+    bid = row.bolumid
+    # Önce etiketi sil
     cursor.execute("DELETE FROM VizeHaftalari WHERE vizeid=%s", (vize_id,))
+    # Kaç slot etkileniyor?
+    cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+    etkilenen = cursor.fetchone()[0]
+    # Slotları geri kayıdır
+    cursor.execute("""
+        UPDATE SunumProgrami
+        SET haftano = haftano - 1,
+            sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
+                               THEN sunumtarihi - make_interval(days => 7)
+                               ELSE NULL END
+        WHERE bolumid=%s AND haftano > %s
+    """, (bid, hafta_no))
+    # Diğer VizeHaftalari kayıtlarını da geri say
+    cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+    # TatilKaydirmaHaftalari kayıtlarını da geri say
+    cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
     conn.commit()
-    flash('Vize haftası etiketi silindi. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
+    flash(f'{hafta_no}. Hafta vize haftası geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
     return _panel_redir(bolum_id, next_page)
 
 
@@ -1317,10 +1341,34 @@ def hoca_tatil_kaydir_sil():
     tatilkaydir_id = request.form.get('tatilkaydir_id', '')
     if not tatilkaydir_id:
         flash('Geçersiz ID.', 'error')
-        return redirect(url_for('hoca.hoca_hafta_yonetimi', bolum_id=bolum_id))
+        return _panel_redir(bolum_id, next_page)
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT bolumid, haftano FROM TatilKaydirmaHaftalari WHERE tatilkaydiraid=%s", (tatilkaydir_id,))
+    row = cursor.fetchone()
+    if not row:
+        flash('Kayıt bulunamadı.', 'error')
+        return _panel_redir(bolum_id, next_page)
+    hafta_no = row.haftano
+    bid = row.bolumid
+    # Önce etiketi sil
     cursor.execute("DELETE FROM TatilKaydirmaHaftalari WHERE tatilkaydiraid=%s", (tatilkaydir_id,))
+    # Kaç slot etkileniyor?
+    cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+    etkilenen = cursor.fetchone()[0]
+    # Slotları geri kayıdır
+    cursor.execute("""
+        UPDATE SunumProgrami
+        SET haftano = haftano - 1,
+            sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
+                               THEN sunumtarihi - make_interval(days => 7)
+                               ELSE NULL END
+        WHERE bolumid=%s AND haftano > %s
+    """, (bid, hafta_no))
+    # Diğer VizeHaftalari kayıtlarını da geri say
+    cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+    # TatilKaydirmaHaftalari kayıtlarını da geri say
+    cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
     conn.commit()
-    flash('Tatil kaydırma etiketi silindi. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
+    flash(f'{hafta_no}. Hafta tatil kaydırması geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
     return _panel_redir(bolum_id, next_page)

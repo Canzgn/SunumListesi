@@ -225,16 +225,32 @@ def admin_panel_vize_sil():
     cursor = conn.cursor()
     if admin_bolum_ids:
         cursor.execute(
-            "DELETE FROM VizeHaftalari WHERE bolumid = ANY(%s) AND haftano = %s",
-            (admin_bolum_ids, hafta_no)
+            "SELECT BolumID FROM Bolumler WHERE BolumID = ANY(%s) AND OgretimTuru = %s",
+            (admin_bolum_ids, tur)
         )
     else:
-        cursor.execute(
-            "DELETE FROM VizeHaftalari WHERE haftano = %s AND bolumid IN (SELECT BolumID FROM Bolumler WHERE OgretimTuru=%s)",
-            (hafta_no, tur)
-        )
+        cursor.execute("SELECT BolumID FROM Bolumler WHERE OgretimTuru = %s", (tur,))
+    bolum_ids = [r.BolumID for r in cursor.fetchall()]
+    if not bolum_ids:
+        flash('Bölüm bulunamadı.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    etkilenen = 0
+    for bid in bolum_ids:
+        cursor.execute("DELETE FROM VizeHaftalari WHERE bolumid=%s AND haftano = %s", (bid, hafta_no))
+        cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+        etkilenen += cursor.fetchone()[0]
+        cursor.execute("""
+            UPDATE SunumProgrami
+            SET haftano = haftano - 1,
+                sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
+                                   THEN sunumtarihi - make_interval(days => 7)
+                                   ELSE NULL END
+            WHERE bolumid=%s AND haftano > %s
+        """, (bid, hafta_no))
+        cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+        cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
     conn.commit()
-    flash(f'{hafta_no}. Hafta vize etiketi kaldırıldı. Not: Kaydırılan tarihler geri alınmadı.', 'warning')
+    flash(f'{hafta_no}. Hafta vize haftası geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 
@@ -288,16 +304,32 @@ def admin_panel_tatil_kaydir_sil():
     cursor = conn.cursor()
     if admin_bolum_ids:
         cursor.execute(
-            "DELETE FROM TatilKaydirmaHaftalari WHERE bolumid = ANY(%s) AND haftano = %s",
-            (admin_bolum_ids, hafta_no)
+            "SELECT BolumID FROM Bolumler WHERE BolumID = ANY(%s) AND OgretimTuru = %s",
+            (admin_bolum_ids, tur)
         )
     else:
-        cursor.execute(
-            "DELETE FROM TatilKaydirmaHaftalari WHERE haftano = %s AND bolumid IN (SELECT BolumID FROM Bolumler WHERE OgretimTuru=%s)",
-            (hafta_no, tur)
-        )
+        cursor.execute("SELECT BolumID FROM Bolumler WHERE OgretimTuru = %s", (tur,))
+    bolum_ids = [r.BolumID for r in cursor.fetchall()]
+    if not bolum_ids:
+        flash('Bölüm bulunamadı.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
+    etkilenen = 0
+    for bid in bolum_ids:
+        cursor.execute("DELETE FROM TatilKaydirmaHaftalari WHERE bolumid=%s AND haftano = %s", (bid, hafta_no))
+        cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+        etkilenen += cursor.fetchone()[0]
+        cursor.execute("""
+            UPDATE SunumProgrami
+            SET haftano = haftano - 1,
+                sunumtarihi = CASE WHEN sunumtarihi IS NOT NULL
+                                   THEN sunumtarihi - make_interval(days => 7)
+                                   ELSE NULL END
+            WHERE bolumid=%s AND haftano > %s
+        """, (bid, hafta_no))
+        cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+        cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
     conn.commit()
-    flash(f'{hafta_no}. Hafta tatil kaydırma etiketi kaldırıldı.', 'warning')
+    flash(f'{hafta_no}. Hafta tatil kaydırması geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
 
 

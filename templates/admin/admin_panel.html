@@ -216,19 +216,19 @@
         {% endif %}
         {# ── HAFTA YÖNETİM BUTONLARI (Admin) ── #}
         {% if sunum.HaftaNo in vize_haftalar|default([]) %}
-        <form action="/admin/panel_vize_sil" method="POST" onsubmit="return confirm('Vize haftası etiketi silinsin mi?\n(Kaydırılan tarihler geri alınmaz)')">
+        <form action="/admin/panel_vize_sil" method="POST" onsubmit="return confirm('Vize haftası geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.')">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
             <button type="submit" class="text-[9px] font-black text-purple-200 hover:text-white border border-purple-400 hover:bg-purple-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
-                <i class="fa-solid fa-xmark"></i> Etiketi Kaldır
+                <i class="fa-solid fa-rotate-left"></i> Geri Al
             </button>
         </form>
         {% elif sunum.HaftaNo in tatilkaydir_haftalar|default([]) %}
-        <form action="/admin/panel_tatil_kaydir_sil" method="POST" onsubmit="return confirm('Tatil kaydırma etiketi silinsin mi?\n(Kaydırılan tarihler geri alınmaz)')">
+        <form action="/admin/panel_tatil_kaydir_sil" method="POST" onsubmit="return confirm('Tatil kaydırması geri alınsın mı?\n{{ sunum.HaftaNo }}. haftanın sonrasındaki tüm slotlar 1 hafta geri kaydırılacak.')">
             <input type="hidden" name="hafta_no" value="{{ sunum.HaftaNo }}">
             <input type="hidden" name="tur" value="{{ selected_tur }}">
             <button type="submit" class="text-[9px] font-black text-orange-200 hover:text-white border border-orange-400 hover:bg-orange-600 px-2 py-0.5 rounded-lg transition normal-case not-italic tracking-normal flex items-center gap-1">
-                <i class="fa-solid fa-xmark"></i> Etiketi Kaldır
+                <i class="fa-solid fa-rotate-left"></i> Geri Al
             </button>
         </form>
         {% else %}
