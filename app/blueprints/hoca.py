@@ -27,7 +27,7 @@ def _verify_bolum_ownership(cursor, bolum_id, hoca_id):
 
 # --- Profil ---
 
-@hoca_bp.route('/profil')
+@hoca_bp.route('/profil', methods=['GET', 'POST'])
 @hoca_required
 def hoca_profil():
     if session.get('user_role') != 'hoca':
@@ -35,6 +35,18 @@ def hoca_profil():
     hoca_id = session['hoca_id']
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    if request.method == 'POST':
+        ad_soyad = request.form.get('ad_soyad', '').strip()
+        if not ad_soyad:
+            flash('Ad Soyad boş bırakılamaz.', 'error')
+        else:
+            cursor.execute("UPDATE Hocalar SET AdSoyad=%s WHERE HocaID=%s", (ad_soyad, hoca_id))
+            conn.commit()
+            session['user_name'] = ad_soyad
+            flash('Profiliniz güncellendi.', 'success')
+        return redirect(url_for('hoca.hoca_profil'))
+
     cursor.execute("SELECT HocaID, Username, AdSoyad FROM Hocalar WHERE HocaID=%s", (hoca_id,))
     hoca = cursor.fetchone()
     cursor.execute("""
