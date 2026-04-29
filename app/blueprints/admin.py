@@ -268,8 +268,12 @@ def admin_panel_vize_sil():
         flash('Bölüm bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
     etkilenen = 0
+    actually_deleted = False
     for bid in bolum_ids:
         cursor.execute("DELETE FROM VizeHaftalari WHERE bolumid=%s AND haftano = %s", (bid, hafta_no))
+        if cursor.rowcount == 0:
+            continue
+        actually_deleted = True
         cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
         etkilenen += cursor.fetchone()[0]
         cursor.execute("""
@@ -282,6 +286,10 @@ def admin_panel_vize_sil():
         """, (bid, hafta_no))
         cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
         cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+    if not actually_deleted:
+        conn.rollback()
+        flash(f'{hafta_no}. Hafta için vize kaydı bulunamadı.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
     conn.commit()
     flash(f'{hafta_no}. Hafta vize haftası geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
@@ -351,8 +359,12 @@ def admin_panel_tatil_kaydir_sil():
         flash('Bölüm bulunamadı.', 'error')
         return redirect(url_for('admin.admin_panel', tur=tur))
     etkilenen = 0
+    actually_deleted = False
     for bid in bolum_ids:
         cursor.execute("DELETE FROM TatilKaydirmaHaftalari WHERE bolumid=%s AND haftano = %s", (bid, hafta_no))
+        if cursor.rowcount == 0:
+            continue
+        actually_deleted = True
         cursor.execute("SELECT COUNT(*) FROM SunumProgrami WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
         etkilenen += cursor.fetchone()[0]
         cursor.execute("""
@@ -365,6 +377,10 @@ def admin_panel_tatil_kaydir_sil():
         """, (bid, hafta_no))
         cursor.execute("UPDATE VizeHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
         cursor.execute("UPDATE TatilKaydirmaHaftalari SET haftano = haftano - 1 WHERE bolumid=%s AND haftano > %s", (bid, hafta_no))
+    if not actually_deleted:
+        conn.rollback()
+        flash(f'{hafta_no}. Hafta için tatil kaydırma kaydı bulunamadı.', 'error')
+        return redirect(url_for('admin.admin_panel', tur=tur))
     conn.commit()
     flash(f'{hafta_no}. Hafta tatil kaydırması geri alındı. {etkilenen} slot bir hafta geri kaydırıldı.', 'success')
     return redirect(url_for('admin.admin_panel', tur=tur))
