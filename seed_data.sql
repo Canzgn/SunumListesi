@@ -76,8 +76,8 @@ ON CONFLICT DO NOTHING;
 -- Data for Name: hocalar; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.hocalar VALUES (1, 'hoca1', 'scrypt:32768:8:1$rbFcB6vRFpYofH16$591f4ecbf20bb15064a9a03594711efbf6665fc194bf2d6c9191b227d533d709e2da154a7b577b4541d6f0d36b6548f1735aa2c5047e6acdb48a7fd74783cef1', 'Öğretmen Hesabı', true);
-INSERT INTO public.hocalar VALUES (3, 'uguryildiz', 'scrypt:32768:8:1$BndsZ39Tl9SMejXI$5761ed3749073adb99ff9ebf7bb3a9f95601fcb3c810d70b416b9226a43e30a299d32bd95a04f7c45fb52bbb1e21819aaf15998c39c68d0232b1bb0b10bec17b', 'Öğr. Gör. Uğur Yıldız', true);
+INSERT INTO public.hocalar VALUES (1, 'hoca1', 'scrypt:32768:8:1$saufyOPRek4CLNS8$a75b0ca0e823187880efbee854609b6270557ce6398af2e5afcf34310e9d1c31865ed15f0df6f4b16b4f89249f6492780dc69ba15fa30609cb6156094aab58ee', 'Öğretmen Hesabı', true);
+INSERT INTO public.hocalar VALUES (3, 'uguryildiz', 'scrypt:32768:8:1$saufyOPRek4CLNS8$a75b0ca0e823187880efbee854609b6270557ce6398af2e5afcf34310e9d1c31865ed15f0df6f4b16b4f89249f6492780dc69ba15fa30609cb6156094aab58ee', 'Öğr. Gör. Uğur Yıldız', true);
 
 
 --
