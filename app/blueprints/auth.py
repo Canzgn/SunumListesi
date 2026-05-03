@@ -141,8 +141,32 @@ def register():
                             INSERT INTO Ogrenciler (OgrenciNo, AdSoyad, OgretimTuru, IsApproved,
                                                     KimlikFoto, KayitTarihi, Password, BolumID, DonemID)
                             VALUES (%s, %s, %s, FALSE, %s, %s, %s, %s, %s)
+                            RETURNING OgrenciID
                         """, (ogr_no, ad_soyad, tur, foto_filename, now_str,
                               hashed_student_pw, bolum_id, donem_id))
+                        new_row = cursor.fetchone()
+                        new_ogr_id = new_row[0] if new_row else None
+
+                        # Daha önce silinmiş ama onaylı sunum slotuna atanmış öğrenciyse
+                        # (konubasvurulari korunuyor, sunumgorevlileri siliniyor) → yeniden bağla
+                        if new_ogr_id:
+                            cursor.execute("""
+                                INSERT INTO sunumgorevlileri (sunumid, ogrenciid)
+                                SELECT DISTINCT kb.sunumid, %s
+                                FROM konubasvurulari kb
+                                WHERE (kb.ogrenci1no = %s OR kb.ogrenci2no = %s)
+                                  AND kb.sunumid IS NOT NULL
+                                  AND EXISTS (
+                                      SELECT 1 FROM sunumgorevlileri sg_check
+                                      WHERE sg_check.sunumid = kb.sunumid
+                                  )
+                                  AND NOT EXISTS (
+                                      SELECT 1 FROM sunumgorevlileri sg_exist
+                                      WHERE sg_exist.sunumid = kb.sunumid
+                                        AND sg_exist.ogrenciid = %s
+                                  )
+                            """, (new_ogr_id, ogr_no, ogr_no, new_ogr_id))
+
                         conn.commit()
                         flash("Kaydınız alındı! Sisteme giriş için admin onayı bekleniyor.")
                         return redirect(url_for('auth.login'))
