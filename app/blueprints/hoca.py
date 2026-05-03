@@ -61,6 +61,7 @@ def hoca_profil():
             cursor.execute("UPDATE Hocalar SET AdSoyad=%s WHERE HocaID=%s", (ad_soyad, hoca_id))
             conn.commit()
             session['user_name'] = ad_soyad
+            session['hoca_name'] = ad_soyad
             flash('Profiliniz güncellendi.', 'success')
         return redirect(url_for('hoca.hoca_profil'))
 

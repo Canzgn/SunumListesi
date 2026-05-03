@@ -2,9 +2,9 @@
 FROM python:3.12-slim
 
 # ---------- 2. Sistem bağımlılıkları ----------
-# psycopg2-binary derleme gerektirmez ama libpq lazım olabilir
+# libpq5: psycopg2 için  |  fonts-dejavu-core: PDF Türkçe karakter desteği
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 && \
+    apt-get install -y --no-install-recommends libpq5 fonts-dejavu-core && \
     rm -rf /var/lib/apt/lists/*
 
 # ---------- 3. Çalışma dizini ----------

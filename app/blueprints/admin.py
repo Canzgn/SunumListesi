@@ -80,7 +80,8 @@ def admin_panel():
         JOIN TatilGunleri tg ON sp.sunumtarihi=tg.tarih
         JOIN Bolumler b ON b.bolumid=sp.bolumid
         WHERE b.donemid=tg.donemid
-    """)
+        AND sp.OgretimTuru = %s
+    """, (selected_tur,))
     tatil_cadisi_sayisi = cursor.fetchone()[0]
 
     cursor.execute("""
@@ -88,7 +89,8 @@ def admin_panel():
         JOIN Bolumler b ON sp.bolumid=b.bolumid
         JOIN Donemler d ON b.donemid=d.donemid
         WHERE d.donembitis IS NOT NULL AND sp.sunumtarihi > d.donembitis AND sp.sunumtarihi IS NOT NULL
-    """)
+        AND sp.OgretimTuru = %s
+    """, (selected_tur,))
     takvim_disi_sayisi = cursor.fetchone()[0]
 
     cursor.execute("SELECT tarih FROM TatilGunleri ORDER BY tarih")
@@ -736,7 +738,7 @@ def delete_registered_user(student_id):
         res = cursor.fetchone()
         if res:
             cursor.execute("DELETE FROM SoruBasvurulari WHERE OgrenciNo = %s", (res[0],))
-            cursor.execute("DELETE FROM KonuBasvurulari WHERE Ogrenci1No = %s OR Ogrenci2No = %s", (res[0], res[0]))
+            # KonuBasvurulari kasıtlı silinmiyor — başvuru geçmiş kaydıdır, öğrenci silinse de korunmalı
         cursor.execute("DELETE FROM Ogrenciler WHERE OgrenciID = %s", (student_id,))
         conn.commit()
         flash("Kullanıcı ve ilişkili tüm verileri başarıyla silindi.")
