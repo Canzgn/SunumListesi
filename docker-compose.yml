@@ -13,6 +13,12 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./supabase_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - ./seed_data.sql:/docker-entrypoint-initdb.d/02_seed_data.sql
+      - ./migrations/001_sunum_dosyalari_ve_takvim.sql:/docker-entrypoint-initdb.d/03_migration_001.sql
+      - ./migrations/002_reset_soru_approvals.sql:/docker-entrypoint-initdb.d/04_migration_002.sql
+      - ./migrations/003_vize_haftalari.sql:/docker-entrypoint-initdb.d/05_migration_003.sql
+      - ./migrations/004_tatil_kaydirma_haftalari.sql:/docker-entrypoint-initdb.d/06_migration_004.sql
+      - ./migrations/005_vize_tatil_metadata.sql:/docker-entrypoint-initdb.d/07_migration_005.sql
+      - ./migrations/006_otomatik_yerlesim_gecmisi.sql:/docker-entrypoint-initdb.d/08_migration_006.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sunum_user -d sunum_db"]
       interval: 5s
