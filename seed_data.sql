@@ -23,7 +23,8 @@ SET row_security = off;
 -- Data for Name: donemler; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.donemler VALUES (1, '2025/26', true, NULL);
+INSERT INTO public.donemler (donemid, donemadi, aktif, basvurubitis, donembaslangic, donembitis)
+    VALUES (1, '2025/26', true, NULL, '2026-02-27', '2026-06-26');
 
 
 --
@@ -50,6 +51,22 @@ INSERT INTO public.admins VALUES (2, 'ahmet', 'scrypt:32768:8:1$bmkAuQJ9knwelk3m
 INSERT INTO public.adminbolumler VALUES (1, 1, 2);
 INSERT INTO public.adminbolumler VALUES (2, 1, 1);
 INSERT INTO public.adminbolumler VALUES (3, 2, 3);
+
+
+--
+-- Data for Name: tatilgunleri; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.tatilgunleri (donemid, tarih, aciklama, eylemtipi) VALUES
+    (1, '2026-01-01', 'Yılbaşı',                            'bilgi'),
+    (1, '2026-04-23', 'Ulusal Egemenlik ve Çocuk Bayramı',  'bilgi'),
+    (1, '2026-05-01', 'Emek ve Dayanışma Bayramı',          'bilgi'),
+    (1, '2026-05-19', 'Atatürk''ü Anma, Gençlik ve Spor',   'bilgi'),
+    (1, '2026-06-15', 'Kurban Bayramı 1. Günü',             'bilgi'),
+    (1, '2026-06-16', 'Kurban Bayramı 2. Günü',             'bilgi'),
+    (1, '2026-06-17', 'Kurban Bayramı 3. Günü',             'bilgi'),
+    (1, '2026-06-18', 'Kurban Bayramı 4. Günü',             'bilgi')
+ON CONFLICT DO NOTHING;
 
 
 --
