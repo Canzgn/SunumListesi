@@ -27,7 +27,7 @@ services:
 
   # ---- Flask uygulaması ----
   web:
-    build: .
+    image: canzgn/sunum-listesi:latest
     restart: unless-stopped
     ports:
       - "5001:5001"
